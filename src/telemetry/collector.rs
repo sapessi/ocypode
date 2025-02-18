@@ -11,12 +11,18 @@ use iracing::Connection;
 
 use crate::OcypodeError;
 
-use super::{wheelspin_analyzer::WheelspinAnalyzer, TelemetryAnalyzer, TelemetryAnnotation};
+use super::{
+    trailbrake_steering_analyzer::TrailbrakeSteeringAnalyzer,
+    wheelspin_analyzer::WheelspinAnalyzer, TelemetryAnalyzer, TelemetryAnnotation,
+};
 
 const CONN_RETRY_WAIT_MS: u64 = 200;
 const CONN_RETRY_MAX_WAIT_S: u64 = 600;
 const REFRESH_RATE_MS: u64 = 100;
 const MIN_WHEELSPIN_POINTS: usize = 500;
+
+const MIN_TRAILBRAKING_PCT: f32 = 0.2;
+const MAX_TRAILBRAKING_STEERING_ANGLE: f32 = 0.1;
 
 pub fn collect_telemetry(
     telemetry_sender: Sender<TelemetryPoint>,
@@ -43,7 +49,13 @@ pub fn collect_telemetry(
     let client = conn.map_err(|e| OcypodeError::NoIRacingFile { source: e })?;
     let mut point_no: usize = 0;
 
-    let mut analyzers = [WheelspinAnalyzer::<MIN_WHEELSPIN_POINTS>::new()];
+    let mut analyzers: Vec<Box<dyn TelemetryAnalyzer>> = vec![
+        Box::new(WheelspinAnalyzer::<MIN_WHEELSPIN_POINTS>::new()),
+        Box::new(TrailbrakeSteeringAnalyzer::new(
+            MAX_TRAILBRAKING_STEERING_ANGLE,
+            MIN_TRAILBRAKING_PCT,
+        )),
+    ];
 
     loop {
         thread::sleep(Duration::from_millis(REFRESH_RATE_MS));
@@ -89,7 +101,7 @@ pub fn collect_telemetry(
 
         let mut annotations: HashMap<String, TelemetryAnnotation> = HashMap::new();
         for analyzer in analyzers.iter_mut() {
-            annotations.extend(analyzer.analyze(&measurement));
+            annotations.extend(analyzer.analyze(&measurement, &telemetry));
         }
         if !annotations.is_empty() {
             measurement.annotations = annotations;
@@ -119,7 +131,7 @@ pub fn collect_telemetry(
     }
 }
 
-fn get_float(telemetry_sample: &Sample, name: &'static str) -> f32 {
+pub(crate) fn get_float(telemetry_sample: &Sample, name: &'static str) -> f32 {
     telemetry_sample
         .get(name)
         .unwrap_or_else(|e| {
@@ -133,7 +145,7 @@ fn get_float(telemetry_sample: &Sample, name: &'static str) -> f32 {
         })
 }
 
-fn get_int(telemetry_sample: &Sample, name: &'static str) -> u32 {
+pub(crate) fn get_int(telemetry_sample: &Sample, name: &'static str) -> u32 {
     telemetry_sample
         .get(name)
         .unwrap_or_else(|e| {
@@ -147,7 +159,7 @@ fn get_int(telemetry_sample: &Sample, name: &'static str) -> u32 {
         })
 }
 
-fn get_bool(telemetry_sample: &Sample, name: &'static str) -> bool {
+pub(crate) fn get_bool(telemetry_sample: &Sample, name: &'static str) -> bool {
     telemetry_sample
         .get(name)
         .unwrap_or_else(|e| {

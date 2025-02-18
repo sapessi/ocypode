@@ -1,9 +1,11 @@
 mod collector;
+mod trailbrake_steering_analyzer;
 mod wheelspin_analyzer;
 
 use std::collections::HashMap;
 
 pub use collector::collect_telemetry;
+use iracing::telemetry::Sample;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -34,6 +36,9 @@ pub struct TelemetryPoint {
 }
 
 pub trait TelemetryAnalyzer {
-    fn analyze(&mut self, telemetry_point: &TelemetryPoint)
-        -> HashMap<String, TelemetryAnnotation>;
+    fn analyze(
+        &mut self,
+        telemetry_point: &TelemetryPoint,
+        sample: &Sample,
+    ) -> HashMap<String, TelemetryAnnotation>;
 }
