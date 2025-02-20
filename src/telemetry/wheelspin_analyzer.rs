@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use iracing::telemetry::Sample;
 use simple_moving_average::{SumTreeSMA, SMA};
 
-use super::{TelemetryAnalyzer, TelemetryAnnotation, TelemetryPoint};
+use super::{SessionInfo, TelemetryAnalyzer, TelemetryAnnotation, TelemetryPoint};
 
 pub struct WheelspinAnalyzer<const WINDOW_SIZE: usize> {
     cur_averages: HashMap<u32, f32>,
@@ -29,7 +28,7 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for WheelspinAnalyzer<WINDOW_SI
     fn analyze(
         &mut self,
         point: &TelemetryPoint,
-        _sample: &Sample,
+        _: &SessionInfo,
     ) -> HashMap<String, TelemetryAnnotation> {
         // process expected RPM growth by gear
         let mut output: HashMap<String, TelemetryAnnotation> = HashMap::new();
