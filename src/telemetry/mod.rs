@@ -1,14 +1,14 @@
 mod collector;
+pub(crate) mod producer;
 mod trailbrake_steering_analyzer;
 mod wheelspin_analyzer;
 
 use std::collections::HashMap;
 
 pub use collector::collect_telemetry;
-use iracing::telemetry::Sample;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum TelemetryAnnotation {
     String(String),
     Float(f32),
@@ -35,10 +35,46 @@ pub struct TelemetryPoint {
     pub annotations: HashMap<String, TelemetryAnnotation>,
 }
 
+impl Default for TelemetryPoint {
+    fn default() -> Self {
+        Self {
+            point_no: 0,
+            lap_dist_pct: 0.,
+            last_lap_time_s: 0.,
+            best_lap_time_s: 0.,
+            car_shift_ideal_rpm: 0.,
+            cur_gear: 0,
+            cur_rpm: 0.,
+            cur_speed: 0.,
+            lap_no: 0,
+            throttle: 0.,
+            brake: 0.,
+            steering: 0.,
+            abs_active: false,
+            annotations: HashMap::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SessionInfo {
+    pub track_name: String,
+    pub max_steering_angle: f32,
+}
+
+impl Default for SessionInfo {
+    fn default() -> Self {
+        Self {
+            track_name: "Unknown".to_string(),
+            max_steering_angle: 0.,
+        }
+    }
+}
+
 pub trait TelemetryAnalyzer {
     fn analyze(
         &mut self,
         telemetry_point: &TelemetryPoint,
-        sample: &Sample,
+        session_info: &SessionInfo,
     ) -> HashMap<String, TelemetryAnnotation>;
 }

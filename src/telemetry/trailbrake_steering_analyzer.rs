@@ -1,15 +1,10 @@
 use std::collections::HashMap;
 
-use iracing::telemetry::Sample;
-
-use crate::telemetry::collector::get_float;
-
-use super::TelemetryAnalyzer;
+use super::{SessionInfo, TelemetryAnalyzer};
 
 pub struct TrailbrakeSteeringAnalyzer {
     max_trailbraking_steering_angle: f32,
     min_trailbraking_pct: f32,
-    max_steering_angle: Option<f32>,
 }
 
 impl TrailbrakeSteeringAnalyzer {
@@ -17,7 +12,6 @@ impl TrailbrakeSteeringAnalyzer {
         Self {
             max_trailbraking_steering_angle,
             min_trailbraking_pct,
-            max_steering_angle: None,
         }
     }
 }
@@ -26,20 +20,9 @@ impl TelemetryAnalyzer for TrailbrakeSteeringAnalyzer {
     fn analyze(
         &mut self,
         telemetry_point: &super::TelemetryPoint,
-        sample: &Sample,
+        session_info: &SessionInfo,
     ) -> std::collections::HashMap<String, super::TelemetryAnnotation> {
-        if self.max_steering_angle.is_none() {
-            let max_angle = get_float(sample, "SteeringWheelAngleMax");
-            if max_angle > 0.0 {
-                self.max_steering_angle = Some(max_angle);
-            } else {
-                return HashMap::new();
-            }
-        }
-        let cur_steering_pct = telemetry_point.steering.abs()
-            / self
-                .max_steering_angle
-                .expect("Max steering angle not populated");
+        let cur_steering_pct = telemetry_point.steering.abs() / session_info.max_steering_angle;
         // we are braking... measure steering angle
         let mut annotations = HashMap::new();
         if telemetry_point.brake > self.min_trailbraking_pct
@@ -55,5 +38,28 @@ impl TelemetryAnalyzer for TrailbrakeSteeringAnalyzer {
             );
         }
         annotations
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::telemetry::{TelemetryAnnotation, TelemetryPoint};
+
+    use super::*;
+
+    #[test]
+    fn test_fires_annotations() {
+        let mut analyzer = TrailbrakeSteeringAnalyzer::new(0.1, 0.2);
+        let point = TelemetryPoint {
+            brake: 0.3,
+            steering: 0.2,
+            ..Default::default()
+        };
+        let annotations = analyzer.analyze(&point, &SessionInfo::default());
+        assert_eq!(annotations.len(), 2);
+        assert_eq!(
+            annotations.get("excessive_trailbrake_steering"),
+            Some(&TelemetryAnnotation::Bool(true))
+        );
     }
 }

@@ -13,7 +13,7 @@ use clap::{arg, Parser, Subcommand};
 use egui::Vec2;
 use live::LiveTelemetryApp;
 use snafu::Snafu;
-use telemetry::TelemetryPoint;
+use telemetry::{producer::IRacingTelemetryProducer, TelemetryPoint};
 
 const HISTORY_SECONDS: usize = 5;
 
@@ -23,6 +23,8 @@ enum OcypodeError {
     NoIRacingFile { source: io::Error },
     #[snafu(display("Timeout waiting for iRacing session"))]
     IRacingConnectionTimeout,
+    #[snafu(display("Telemetry point producer error"))]
+    TelemetryProducerError { description: &'static str },
     #[snafu(display("Error broadcasting telemetry data point"))]
     TelemetryBroadcastError { source: SendError<TelemetryPoint> },
     #[snafu(display("Error writing telemetry file"))]
@@ -60,10 +62,22 @@ fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError>
     if let Some(output_file) = output {
         let (telemetry_writer_tx, telemetry_writer_rx) =
             mpsc::channel::<telemetry::TelemetryPoint>();
-        thread::spawn(move || telemetry::collect_telemetry(telemtry_tx, Some(telemetry_writer_tx)));
+        thread::spawn(move || {
+            let telemetry_producer = IRacingTelemetryProducer::default();
+            telemetry::collect_telemetry(
+                telemetry_producer,
+                telemtry_tx,
+                Some(telemetry_writer_tx),
+            )
+            .expect("Error while reading telemetry");
+        });
         thread::spawn(move || writer::write_telemetry(&output_file, telemetry_writer_rx));
     } else {
-        thread::spawn(move || telemetry::collect_telemetry(telemtry_tx, None));
+        thread::spawn(move || {
+            let telemetry_producer = IRacingTelemetryProducer::default();
+            telemetry::collect_telemetry(telemetry_producer, telemtry_tx, None)
+                .expect("Error while reading telemetry");
+        });
     }
 
     let app = LiveTelemetryApp::new(telemetry_rx, window_size);
