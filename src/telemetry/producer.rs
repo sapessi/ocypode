@@ -4,10 +4,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use iracing::{
-    telemetry::{Sample, Value},
-    Connection,
-};
+use iracing::telemetry::{Sample, Value, Connection};
 
 use crate::OcypodeError;
 
@@ -26,7 +23,7 @@ pub trait TelemetryProducer {
 }
 
 pub(crate) struct IRacingTelemetryProducer {
-    client: Option<iracing::Connection>,
+    client: Option<Connection>,
     retry_wait_ms: u64,
     retry_timeout_s: u64,
     point_no: usize,
@@ -101,6 +98,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
                     description: "Could not retrieve telemetry",
                 }
             })?;
+        
         Ok(SessionInfo {
             track_name: ir_session_info.weekend.track_name,
             max_steering_angle: get_float(&telemetry, "SteeringWheelAngleMax"),
