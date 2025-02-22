@@ -4,7 +4,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use iracing::telemetry::{Sample, Value, Connection};
+use iracing::telemetry::{Connection, Sample, Value};
 
 use crate::OcypodeError;
 
@@ -98,7 +98,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
                     description: "Could not retrieve telemetry",
                 }
             })?;
-        
+
         Ok(SessionInfo {
             track_name: ir_session_info.weekend.track_name,
             max_steering_angle: get_float(&telemetry, "SteeringWheelAngleMax"),
