@@ -21,6 +21,14 @@ impl LiveTelemetryApp {
                     ui.add(ImageButton::new(egui::include_image!(
                         "../../assets/tools-fill.png"
                     )));
+                    if ui
+                        .add(ImageButton::new(egui::include_image!(
+                            "../../assets/alert-fill.png"
+                        )))
+                        .clicked()
+                    {
+                        self.show_alerts = !self.show_alerts;
+                    };
 
                     ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui

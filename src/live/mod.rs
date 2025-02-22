@@ -28,6 +28,7 @@ pub struct LiveTelemetryApp {
     telemetry_receiver: Receiver<TelemetryPoint>,
     window_size_points: usize,
     telemetry_points: VecDeque<TelemetryPoint>,
+    show_alerts: bool,
 }
 
 impl LiveTelemetryApp {
@@ -37,6 +38,7 @@ impl LiveTelemetryApp {
             telemetry_receiver,
             window_size_points,
             telemetry_points: VecDeque::new(),
+            show_alerts: false,
         }
     }
 }
@@ -77,20 +79,22 @@ impl eframe::App for LiveTelemetryApp {
         self.telemetry_view(ctx, _frame);
 
         // open separate alerts viewport
-        ctx.show_viewport_immediate(
-            ViewportId::from_hash_of("alerts"),
-            ViewportBuilder::default()
-                .with_always_on_top()
-                .with_decorations(false)
-                .with_transparent(true)
-                .with_inner_size(Vec2::new(100., 500.)),
-            |ctx, class| {
-                assert!(
-                    class == egui::ViewportClass::Immediate,
-                    "This egui backend doesn't support multiple viewports"
-                );
-                self.alerts_view(ctx, _frame);
-            },
-        );
+        if self.show_alerts {
+            ctx.show_viewport_immediate(
+                ViewportId::from_hash_of("alerts"),
+                ViewportBuilder::default()
+                    .with_always_on_top()
+                    .with_decorations(false)
+                    .with_transparent(true)
+                    .with_inner_size(Vec2::new(100., 500.)),
+                |ctx, class| {
+                    assert!(
+                        class == egui::ViewportClass::Immediate,
+                        "This egui backend doesn't support multiple viewports"
+                    );
+                    self.alerts_view(ctx, _frame);
+                },
+            );
+        }
     }
 }
