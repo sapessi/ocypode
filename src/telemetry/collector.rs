@@ -10,7 +10,7 @@ use super::{
 };
 
 const REFRESH_RATE_MS: u64 = 100;
-const MIN_WHEELSPIN_POINTS: usize = 500;
+const MIN_WHEELSPIN_POINTS: usize = 100;
 
 const MIN_TRAILBRAKING_PCT: f32 = 0.2;
 const MAX_TRAILBRAKING_STEERING_ANGLE: f32 = 0.1;

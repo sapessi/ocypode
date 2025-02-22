@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use itertools::Itertools;
 use simple_moving_average::{SumTreeSMA, SMA};
 
 use super::{SessionInfo, TelemetryAnalyzer, TelemetryAnnotation, TelemetryPoint};
@@ -9,7 +10,7 @@ pub struct WheelspinAnalyzer<const WINDOW_SIZE: usize> {
     telemetry_window: HashMap<u32, SumTreeSMA<f32, f32, WINDOW_SIZE>>,
     prev_gear: u32,
     prev_rpm: f32,
-    cur_wheelspin_points: usize,
+    cur_gear_points: HashMap<u32, usize>,
 }
 
 impl<const WINDOW_SIZE: usize> WheelspinAnalyzer<WINDOW_SIZE> {
@@ -19,7 +20,7 @@ impl<const WINDOW_SIZE: usize> WheelspinAnalyzer<WINDOW_SIZE> {
             telemetry_window: HashMap::new(),
             prev_gear: 0,
             prev_rpm: 0.,
-            cur_wheelspin_points: 0,
+            cur_gear_points: HashMap::new(),
         }
     }
 }
@@ -39,28 +40,40 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for WheelspinAnalyzer<WINDOW_SI
                 let rpm_growth = point.cur_rpm - self.prev_rpm;
 
                 if let Some(cur_average) = self.cur_averages.get(&point.cur_gear) {
-                    if rpm_growth > *cur_average * 1.1 && self.cur_wheelspin_points >= WINDOW_SIZE {
+                    if rpm_growth > *cur_average
+                        && *self.cur_gear_points.entry(point.cur_gear).or_insert(0) >= WINDOW_SIZE
+                    {
                         output.insert("wheelspin".to_string(), TelemetryAnnotation::Bool(true));
-                    }
-                }
-                // we only add a data point to our average if the user is in full acceleration
-                if point.throttle > 0.8 {
-                    self.telemetry_window
-                        .entry(point.cur_gear)
-                        .or_insert_with(SumTreeSMA::new)
-                        .add_sample(rpm_growth);
-                    *self.cur_averages.entry(point.cur_gear).or_insert(0.) = self
-                        .telemetry_window
-                        .get(&point.cur_gear)
-                        .unwrap()
-                        .get_average();
-                    if self.cur_wheelspin_points < WINDOW_SIZE {
-                        self.cur_wheelspin_points += 1;
-                    } else {
+                        output.insert(
+                            "rpm_change".to_string(),
+                            TelemetryAnnotation::Float(rpm_growth),
+                        );
                         output.insert(
                             "rpm_grpwth_avgs".to_string(),
                             TelemetryAnnotation::NumberMap(self.cur_averages.clone()),
                         );
+                    }
+                }
+                // we only add a data point to our average if the user is in full acceleration
+                if point.throttle > 0.95 && point.brake == 0. {
+                    self.telemetry_window
+                        .entry(point.cur_gear)
+                        .or_insert_with(SumTreeSMA::new)
+                        .add_sample(rpm_growth);
+
+                    if *self.cur_gear_points.entry(point.cur_gear).or_insert(0) < WINDOW_SIZE {
+                        self.cur_gear_points
+                            .entry(point.cur_gear)
+                            .and_modify(|e| *e += 1);
+                    } else {
+                        *self.cur_averages.entry(point.cur_gear).or_insert(0.) = *self
+                            .telemetry_window
+                            .get(&point.cur_gear)
+                            .unwrap()
+                            .get_sample_window_iter()
+                            .sorted_by(|a, b| a.partial_cmp(b).unwrap())
+                            .nth((WINDOW_SIZE as f32 * 0.9) as usize)
+                            .unwrap();
                     }
                 }
             }
