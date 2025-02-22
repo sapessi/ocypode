@@ -7,7 +7,7 @@ use super::LiveTelemetryApp;
 
 impl LiveTelemetryApp {
     pub(crate) fn telemetry_view(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::TopBottomPanel::top("alerts")
+        egui::TopBottomPanel::top("settings")
             .min_height(30.)
             .show(ctx, |ui| {
                 if ui

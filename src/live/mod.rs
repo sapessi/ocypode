@@ -11,6 +11,20 @@ const REFRESH_RATE_MS: u64 = 100;
 const MAX_POINTS_PER_REFRESH: usize = 10;
 const MAX_TIME_PER_REFRESH_MS: u128 = 50;
 
+pub(crate) enum AlertsLayout {
+    Vertical,
+    Horizontal,
+}
+
+impl AlertsLayout {
+    pub(crate) fn window_size(&self) -> Vec2 {
+        match self {
+            Self::Vertical => Vec2::new(100., 500.),
+            Self::Horizontal => Vec2::new(500., 100.),
+        }
+    }
+}
+
 /// `LiveTelemetryApp` is an application that displays live telemetry data in a graphical interface.
 ///
 /// # Fields
@@ -29,6 +43,7 @@ pub struct LiveTelemetryApp {
     window_size_points: usize,
     telemetry_points: VecDeque<TelemetryPoint>,
     show_alerts: bool,
+    alerts_layout: AlertsLayout,
 }
 
 impl LiveTelemetryApp {
@@ -39,6 +54,7 @@ impl LiveTelemetryApp {
             window_size_points,
             telemetry_points: VecDeque::new(),
             show_alerts: false,
+            alerts_layout: AlertsLayout::Vertical,
         }
     }
 }
@@ -86,7 +102,7 @@ impl eframe::App for LiveTelemetryApp {
                     .with_always_on_top()
                     .with_decorations(false)
                     .with_transparent(true)
-                    .with_inner_size(Vec2::new(100., 500.)),
+                    .with_inner_size(self.alerts_layout.window_size()),
                 |ctx, class| {
                     assert!(
                         class == egui::ViewportClass::Immediate,
