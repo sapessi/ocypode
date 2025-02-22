@@ -48,14 +48,14 @@ impl eframe::App for LiveTelemetryApp {
         // read telemetry to window
         let start_refresh = SystemTime::now();
         // consume a few telemetry points and then exist the loop to avoid blocking the UI
-        for point in self.telemetry_receiver.iter().enumerate() {
+        for point in self.telemetry_receiver.try_recv().iter().enumerate() {
             if let Some(last) = self.telemetry_points.back() {
                 if point.1.point_no < last.point_no {
                     self.telemetry_points.clear()
                 }
             }
 
-            self.telemetry_points.push_back(point.1);
+            self.telemetry_points.push_back(point.1.clone());
 
             while self.telemetry_points.len() >= self.window_size_points
                 && self.telemetry_points.front().is_some()
