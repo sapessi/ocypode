@@ -15,7 +15,7 @@ impl LiveTelemetryApp {
                 {
                     ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
                 }
-                match self.alerts_layout {
+                match self.app_config.alerts_layout {
                     AlertsLayout::Vertical => {
                         if ui
                             .add(ImageButton::new(egui::include_image!(
@@ -24,7 +24,7 @@ impl LiveTelemetryApp {
                             .clicked()
                         {
                             println!("clicked");
-                            self.alerts_layout = AlertsLayout::Horizontal;
+                            self.app_config.alerts_layout = AlertsLayout::Horizontal;
                         }
                     }
                     AlertsLayout::Horizontal => {
@@ -34,12 +34,12 @@ impl LiveTelemetryApp {
                             )))
                             .clicked()
                         {
-                            self.alerts_layout = AlertsLayout::Vertical;
+                            self.app_config.alerts_layout = AlertsLayout::Vertical;
                         }
                     }
                 }
             });
-        egui::CentralPanel::default().show(ctx, |ui| match self.alerts_layout {
+        egui::CentralPanel::default().show(ctx, |ui| match self.app_config.alerts_layout {
             AlertsLayout::Vertical => {
                 ui.with_layout(Layout::top_down(Align::TOP), |ui| {
                     self.show_alerts(ui);

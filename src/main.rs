@@ -11,11 +11,9 @@ use std::{
 
 use clap::{arg, Parser, Subcommand};
 use egui::Vec2;
-use live::LiveTelemetryApp;
+use live::{AppConfig, LiveTelemetryApp, HISTORY_SECONDS};
 use snafu::Snafu;
 use telemetry::{producer::IRacingTelemetryProducer, TelemetryPoint};
-
-const HISTORY_SECONDS: usize = 5;
 
 #[derive(Debug, Snafu)]
 enum OcypodeError {
@@ -80,7 +78,13 @@ fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError>
         });
     }
 
-    let app = LiveTelemetryApp::new(telemetry_rx, window_size);
+    let app = LiveTelemetryApp::new(
+        telemetry_rx,
+        AppConfig {
+            window_size_s: window_size,
+            ..Default::default()
+        },
+    );
     let mut native_options = eframe::NativeOptions::default();
     native_options.viewport = native_options
         .viewport

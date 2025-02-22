@@ -27,7 +27,7 @@ impl LiveTelemetryApp {
                         )))
                         .clicked()
                     {
-                        self.show_alerts = !self.show_alerts;
+                        self.app_config.show_alerts = !self.app_config.show_alerts;
                     };
 
                     ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {

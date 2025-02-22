@@ -4,13 +4,16 @@ mod telemetry_view;
 use std::{collections::VecDeque, sync::mpsc::Receiver, time::SystemTime};
 
 use egui::{Vec2, ViewportBuilder, ViewportId};
+use serde::{Deserialize, Serialize};
 
 use crate::telemetry::TelemetryPoint;
 
-const REFRESH_RATE_MS: u64 = 100;
+const REFRESH_RATE_MS: usize = 100;
+pub(crate) const HISTORY_SECONDS: usize = 5;
 const MAX_POINTS_PER_REFRESH: usize = 10;
 const MAX_TIME_PER_REFRESH_MS: u128 = 50;
 
+#[derive(Serialize, Deserialize, Debug)]
 pub(crate) enum AlertsLayout {
     Vertical,
     Horizontal,
@@ -21,6 +24,25 @@ impl AlertsLayout {
         match self {
             Self::Vertical => Vec2::new(100., 500.),
             Self::Horizontal => Vec2::new(500., 100.),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub(crate) struct AppConfig {
+    pub(crate) refresh_rate_ms: usize,
+    pub(crate) window_size_s: usize,
+    pub(crate) show_alerts: bool,
+    pub(crate) alerts_layout: AlertsLayout,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            refresh_rate_ms: REFRESH_RATE_MS,
+            window_size_s: HISTORY_SECONDS,
+            show_alerts: false,
+            alerts_layout: AlertsLayout::Vertical,
         }
     }
 }
@@ -42,19 +64,17 @@ pub struct LiveTelemetryApp {
     telemetry_receiver: Receiver<TelemetryPoint>,
     window_size_points: usize,
     telemetry_points: VecDeque<TelemetryPoint>,
-    show_alerts: bool,
-    alerts_layout: AlertsLayout,
+    app_config: AppConfig,
 }
 
 impl LiveTelemetryApp {
-    pub fn new(telemetry_receiver: Receiver<TelemetryPoint>, window_size: usize) -> Self {
-        let window_size_points = window_size * (1000 / REFRESH_RATE_MS as usize);
+    pub fn new(telemetry_receiver: Receiver<TelemetryPoint>, app_config: AppConfig) -> Self {
+        let window_size_points = app_config.window_size_s * (1000 / app_config.refresh_rate_ms);
         Self {
             telemetry_receiver,
             window_size_points,
             telemetry_points: VecDeque::new(),
-            show_alerts: false,
-            alerts_layout: AlertsLayout::Vertical,
+            app_config,
         }
     }
 }
@@ -95,14 +115,14 @@ impl eframe::App for LiveTelemetryApp {
         self.telemetry_view(ctx, _frame);
 
         // open separate alerts viewport
-        if self.show_alerts {
+        if self.app_config.show_alerts {
             ctx.show_viewport_immediate(
                 ViewportId::from_hash_of("alerts"),
                 ViewportBuilder::default()
                     .with_always_on_top()
                     .with_decorations(false)
                     .with_transparent(true)
-                    .with_inner_size(self.alerts_layout.window_size()),
+                    .with_inner_size(self.app_config.alerts_layout.window_size()),
                 |ctx, class| {
                     assert!(
                         class == egui::ViewportClass::Immediate,
