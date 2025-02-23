@@ -7,20 +7,31 @@ use super::LiveTelemetryApp;
 
 impl LiveTelemetryApp {
     pub(crate) fn telemetry_view(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::TopBottomPanel::top("alerts")
+        egui::TopBottomPanel::top("settings")
             .min_height(30.)
             .show(ctx, |ui| {
-                if ui
-                    .interact(ui.max_rect(), Id::new("window-drag"), Sense::drag())
-                    .dragged()
-                {
+                let drag_sense = ui.interact(ui.max_rect(), Id::new("window-drag"), Sense::drag());
+                if drag_sense.dragged() {
                     ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
+                }
+                if drag_sense.drag_stopped() {
+                    if let Some(outer_rect) = ui.input(|is| is.viewport().outer_rect) {
+                        self.app_config.telemetry_window_position = outer_rect.min.into();
+                    }
                 }
                 ui.with_layout(Layout::left_to_right(egui::Align::Center), |ui| {
                     // icons from https://remixicon.com/
                     ui.add(ImageButton::new(egui::include_image!(
                         "../../assets/tools-fill.png"
                     )));
+                    if ui
+                        .add(ImageButton::new(egui::include_image!(
+                            "../../assets/alert-fill.png"
+                        )))
+                        .clicked()
+                    {
+                        self.app_config.show_alerts = !self.app_config.show_alerts;
+                    };
 
                     ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
@@ -29,7 +40,7 @@ impl LiveTelemetryApp {
                             )))
                             .clicked()
                         {
-                            std::process::exit(0);
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                         }
                     });
                 });
