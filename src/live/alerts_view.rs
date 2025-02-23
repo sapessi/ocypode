@@ -26,7 +26,6 @@ impl LiveTelemetryApp {
                             )))
                             .clicked()
                         {
-                            println!("clicked");
                             self.app_config.alerts_layout = AlertsLayout::Horizontal;
                         }
                     }
