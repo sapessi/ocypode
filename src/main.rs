@@ -11,22 +11,35 @@ use std::{
 
 use clap::{arg, Parser, Subcommand};
 use egui::Vec2;
-use live::{AppConfig, LiveTelemetryApp, HISTORY_SECONDS};
+use live::{config::AppConfig, LiveTelemetryApp, HISTORY_SECONDS};
 use snafu::Snafu;
 use telemetry::{producer::IRacingTelemetryProducer, TelemetryPoint};
 
 #[derive(Debug, Snafu)]
 enum OcypodeError {
+    // Errors for the iRacing client
     #[snafu(display("Unable to find iRacing session"))]
     NoIRacingFile { source: io::Error },
     #[snafu(display("Timeout waiting for iRacing session"))]
     IRacingConnectionTimeout,
+
+    // Errors while reading and broadcasting telemetry data
     #[snafu(display("Telemetry point producer error"))]
     TelemetryProducerError { description: &'static str },
     #[snafu(display("Error broadcasting telemetry data point"))]
     TelemetryBroadcastError { source: SendError<TelemetryPoint> },
+
+    // Errors for the telemetry writer
     #[snafu(display("Error writing telemetry file"))]
     WriterError { source: io::Error },
+
+    // Config managaement errors
+    #[snafu(display("Could not find application data directory to save config file"))]
+    NoConfigDir,
+    #[snafu(display("Error writing config file"))]
+    ConfigIOError { source: io::Error },
+    #[snafu(display("Error serializing config file"))]
+    ConfigSerializeError { source: serde_json::Error },
 }
 
 #[derive(Parser, Debug)]
@@ -78,13 +91,12 @@ fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError>
         });
     }
 
-    let app = LiveTelemetryApp::new(
-        telemetry_rx,
-        AppConfig {
-            window_size_s: window_size,
-            ..Default::default()
-        },
-    );
+    let app_config = AppConfig::from_local_file().unwrap_or(AppConfig {
+        window_size_s: window_size,
+        ..Default::default()
+    });
+
+    let app = LiveTelemetryApp::new(telemetry_rx, app_config);
     let mut native_options = eframe::NativeOptions::default();
     native_options.viewport = native_options
         .viewport

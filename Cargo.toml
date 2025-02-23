@@ -17,3 +17,4 @@ snafu = "0.8.5"
 egui_plot = { git="https://github.com/sapessi/egui_plot.git", branch="gradient_line" }
 iracing = { git="https://github.com/LeoAdamek/iracing.rs", features = [ "telemetry"] }
 itertools = "0.14.0"
+dirs = "6.0.0"

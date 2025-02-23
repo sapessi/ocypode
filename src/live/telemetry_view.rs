@@ -37,7 +37,7 @@ impl LiveTelemetryApp {
                             )))
                             .clicked()
                         {
-                            std::process::exit(0);
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                         }
                     });
                 });

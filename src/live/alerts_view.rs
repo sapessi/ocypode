@@ -2,7 +2,7 @@ use egui::{Align, Id, Image, ImageButton, Layout, Sense, ViewportCommand};
 
 use crate::telemetry::TelemetryAnnotation;
 
-use super::{AlertsLayout, LiveTelemetryApp};
+use super::{config::AlertsLayout, LiveTelemetryApp};
 
 impl LiveTelemetryApp {
     pub(crate) fn alerts_view(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {

@@ -1,10 +1,11 @@
 mod alerts_view;
+pub(crate) mod config;
 mod telemetry_view;
 
 use std::{collections::VecDeque, sync::mpsc::Receiver, time::SystemTime};
 
-use egui::{Vec2, ViewportBuilder, ViewportId};
-use serde::{Deserialize, Serialize};
+use config::AppConfig;
+use egui::{ViewportBuilder, ViewportId};
 
 use crate::telemetry::TelemetryPoint;
 
@@ -12,40 +13,6 @@ const REFRESH_RATE_MS: usize = 100;
 pub(crate) const HISTORY_SECONDS: usize = 5;
 const MAX_POINTS_PER_REFRESH: usize = 10;
 const MAX_TIME_PER_REFRESH_MS: u128 = 50;
-
-#[derive(Serialize, Deserialize, Debug)]
-pub(crate) enum AlertsLayout {
-    Vertical,
-    Horizontal,
-}
-
-impl AlertsLayout {
-    pub(crate) fn window_size(&self) -> Vec2 {
-        match self {
-            Self::Vertical => Vec2::new(100., 500.),
-            Self::Horizontal => Vec2::new(500., 100.),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub(crate) struct AppConfig {
-    pub(crate) refresh_rate_ms: usize,
-    pub(crate) window_size_s: usize,
-    pub(crate) show_alerts: bool,
-    pub(crate) alerts_layout: AlertsLayout,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            refresh_rate_ms: REFRESH_RATE_MS,
-            window_size_s: HISTORY_SECONDS,
-            show_alerts: false,
-            alerts_layout: AlertsLayout::Vertical,
-        }
-    }
-}
 
 /// `LiveTelemetryApp` is an application that displays live telemetry data in a graphical interface.
 ///
@@ -80,6 +47,12 @@ impl LiveTelemetryApp {
 }
 
 impl eframe::App for LiveTelemetryApp {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        if let Err(e) = self.app_config.save() {
+            println!("Error while saving config file: {}", e);
+        }
+    }
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui_extras::install_image_loaders(ctx);
 
