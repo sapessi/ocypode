@@ -13,6 +13,13 @@ Ocypode analyzes telemetry data in real-time to show intuitive alerts for excess
 ### Free and open source
 I want Ocypode to remain a free, open-source tool
 
+## Testing Ocypode
+Until I release [a first version](https://github.com/users/sapessi/projects/1/views/1), you can clone the repo and run it on your local machine. Install the [Rust toolchain using `rustup`](https://rustup.rs/) and then run the app using a terminal in the project folder:
+
+```sh
+$ cargo run -- live
+```
+
 ## Status
 The real-time view with basic telemetry and alerts is working. The offline analysis portion is lower priority for a first release. I have created [a project](https://github.com/users/sapessi/projects/1/views/1) to track the first official release.
 
@@ -22,5 +29,5 @@ To keep the source code clean, we have a pre-commit git hook that runs the stand
 ```sh
 $ cargo install rustfmt
 $ rustup component add clippy
-$  git config --local core.hooksPath .githooks/
+$ git config --local core.hooksPath .githooks/
 ```
