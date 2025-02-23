@@ -9,11 +9,14 @@ impl LiveTelemetryApp {
         egui::TopBottomPanel::top("Controls")
             .min_height(30.)
             .show(ctx, |ui| {
-                if ui
-                    .interact(ui.max_rect(), Id::new("window-drag"), Sense::drag())
-                    .dragged()
-                {
+                let drag_sense = ui.interact(ui.max_rect(), Id::new("window-drag"), Sense::drag());
+                if drag_sense.dragged() {
                     ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
+                }
+                if drag_sense.drag_stopped() {
+                    if let Some(outer_rect) = ui.input(|is| is.viewport().outer_rect) {
+                        self.app_config.alert_window_position = outer_rect.min.into();
+                    };
                 }
                 match self.app_config.alerts_layout {
                     AlertsLayout::Vertical => {

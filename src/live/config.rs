@@ -1,4 +1,4 @@
-use egui::Vec2;
+use egui::{Pos2, Vec2};
 use serde::{Deserialize, Serialize};
 
 use crate::OcypodeError;
@@ -22,12 +22,41 @@ impl AlertsLayout {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct WindowPosition {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+}
+
+impl Default for WindowPosition {
+    fn default() -> Self {
+        Self { x: 0., y: 0. }
+    }
+}
+
+impl From<WindowPosition> for Pos2 {
+    fn from(value: WindowPosition) -> Self {
+        Pos2::new(value.x, value.y)
+    }
+}
+
+impl From<Pos2> for WindowPosition {
+    fn from(value: Pos2) -> Self {
+        Self {
+            x: value.x,
+            y: value.y,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct AppConfig {
     pub(crate) refresh_rate_ms: usize,
     pub(crate) window_size_s: usize,
     pub(crate) show_alerts: bool,
     pub(crate) alerts_layout: AlertsLayout,
+    pub(crate) telemetry_window_position: WindowPosition,
+    pub(crate) alert_window_position: WindowPosition,
 }
 
 impl Default for AppConfig {
@@ -37,6 +66,8 @@ impl Default for AppConfig {
             window_size_s: HISTORY_SECONDS,
             show_alerts: false,
             alerts_layout: AlertsLayout::Vertical,
+            telemetry_window_position: WindowPosition::default(),
+            alert_window_position: WindowPosition::default(),
         }
     }
 }

@@ -95,6 +95,7 @@ fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError>
         window_size_s: window_size,
         ..Default::default()
     });
+    let telemetry_window_position = app_config.telemetry_window_position.clone();
 
     let app = LiveTelemetryApp::new(telemetry_rx, app_config);
     let mut native_options = eframe::NativeOptions::default();
@@ -103,7 +104,9 @@ fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError>
         .with_always_on_top()
         .with_decorations(false)
         .with_transparent(true)
-        .with_inner_size(Vec2::new(500., 200.));
+        .with_inner_size(Vec2::new(500., 200.))
+        .with_position(telemetry_window_position);
+
     eframe::run_native(
         "Monitor app",
         native_options,

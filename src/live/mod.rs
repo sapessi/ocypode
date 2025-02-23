@@ -95,6 +95,7 @@ impl eframe::App for LiveTelemetryApp {
                     .with_always_on_top()
                     .with_decorations(false)
                     .with_transparent(true)
+                    .with_position(self.app_config.alert_window_position.clone())
                     .with_inner_size(self.app_config.alerts_layout.window_size()),
                 |ctx, class| {
                     assert!(
