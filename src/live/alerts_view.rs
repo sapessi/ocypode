@@ -78,15 +78,19 @@ impl LiveTelemetryApp {
                 wheelspin_image = egui::include_image!("../../assets/wheelspin-red.png");
             }
         }
-
-        ui.label("ABS");
-        ui.add(Image::new(abs_image));
+        ui.with_layout(Layout::top_down(Align::TOP), |ui| {
+            ui.label("ABS");
+            ui.add(Image::new(abs_image));
+        });
         ui.separator();
-        ui.label("Shift");
-        ui.add(Image::new(shift_image));
-
+        ui.with_layout(Layout::top_down(Align::TOP), |ui| {
+            ui.label("Shift");
+            ui.add(Image::new(shift_image));
+        });
         ui.separator();
-        ui.label("Traction");
-        ui.add(Image::new(wheelspin_image));
+        ui.with_layout(Layout::top_down(Align::TOP), |ui| {
+            ui.label("Traction");
+            ui.add(Image::new(wheelspin_image));
+        });
     }
 }
