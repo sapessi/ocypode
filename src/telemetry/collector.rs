@@ -47,7 +47,9 @@ pub fn collect_telemetry(
                 "Could not send telemetry point: {}\n\n {:#?}",
                 e, measurement
             );
-            OcypodeError::TelemetryBroadcastError { source: e }
+            OcypodeError::TelemetryBroadcastError {
+                source: Box::new(e),
+            }
         })?;
         if let Some(ref writer_sender) = telemetry_writer_sender {
             writer_sender.send(measurement.clone()).map_err(|e| {
@@ -55,7 +57,9 @@ pub fn collect_telemetry(
                     "Could not send telemetry point: {}\n\n {:#?}",
                     e, measurement
                 );
-                OcypodeError::TelemetryBroadcastError { source: e }
+                OcypodeError::TelemetryBroadcastError {
+                    source: Box::new(e),
+                }
             })?;
         }
     }

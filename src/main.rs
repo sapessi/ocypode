@@ -27,7 +27,9 @@ enum OcypodeError {
     #[snafu(display("Telemetry point producer error"))]
     TelemetryProducerError { description: &'static str },
     #[snafu(display("Error broadcasting telemetry data point"))]
-    TelemetryBroadcastError { source: SendError<TelemetryPoint> },
+    TelemetryBroadcastError {
+        source: Box<SendError<TelemetryPoint>>,
+    },
 
     // Errors for the telemetry writer
     #[snafu(display("Error writing telemetry file"))]

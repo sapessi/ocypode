@@ -4,14 +4,103 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use iracing::telemetry::{Connection, Sample, Value};
+use iracing::telemetry::{Connection, Sample};
 
 use crate::OcypodeError;
 
-use super::{SessionInfo, TelemetryPoint};
+use super::{SessionInfo, TelemetryPoint, TireInfo};
 
 const CONN_RETRY_WAIT_MS: u64 = 200;
 const CONN_RETRY_MAX_WAIT_S: u64 = 600;
+
+pub trait SimplifiedTelemetryAccess {
+    fn get_float(&self, name: &'static str) -> Option<f32>;
+    fn get_int(&self, name: &'static str) -> Option<u32>;
+    fn get_bool(&self, name: &'static str) -> Option<bool>;
+    fn get_lf_tire_info(&self) -> Option<TireInfo>;
+    fn get_rf_tire_info(&self) -> Option<TireInfo>;
+    fn get_lr_tire_info(&self) -> Option<TireInfo>;
+    fn get_rr_tire_info(&self) -> Option<TireInfo>;
+}
+
+impl SimplifiedTelemetryAccess for Sample {
+    fn get_float(&self, name: &'static str) -> Option<f32> {
+        if let Ok(value) = self.get(name) {
+            return value.try_into().ok();
+        }
+        None
+    }
+
+    fn get_int(&self, name: &'static str) -> Option<u32> {
+        if let Ok(value) = self.get(name) {
+            return value.try_into().ok();
+        }
+        None
+    }
+
+    fn get_bool(&self, name: &'static str) -> Option<bool> {
+        if let Ok(value) = self.get(name) {
+            return Some(value.into());
+        }
+        None
+    }
+
+    fn get_lf_tire_info(&self) -> Option<TireInfo> {
+        if self.has("LFtempCL") {
+            return Some(TireInfo {
+                left_carcass_temp: self.get_float("LFtempCL").unwrap_or(0.),
+                middle_carcass_temp: self.get_float("LFtempCM").unwrap_or(0.),
+                right_carcass_temp: self.get_float("LFtempCR").unwrap_or(0.),
+                left_surface_temp: self.get_float("LFtempL").unwrap_or(0.),
+                middle_surface_temp: self.get_float("LFtempM").unwrap_or(0.),
+                right_surface_temp: self.get_float("LFtempR").unwrap_or(0.),
+            });
+        }
+        None
+    }
+
+    fn get_rf_tire_info(&self) -> Option<TireInfo> {
+        if self.has("LFtempCL") {
+            return Some(TireInfo {
+                left_carcass_temp: self.get_float("RFtempCL").unwrap_or(0.),
+                middle_carcass_temp: self.get_float("RFtempCM").unwrap_or(0.),
+                right_carcass_temp: self.get_float("RFtempCR").unwrap_or(0.),
+                left_surface_temp: self.get_float("RFtempL").unwrap_or(0.),
+                middle_surface_temp: self.get_float("RFtempM").unwrap_or(0.),
+                right_surface_temp: self.get_float("RFtempR").unwrap_or(0.),
+            });
+        }
+        None
+    }
+
+    fn get_lr_tire_info(&self) -> Option<TireInfo> {
+        if self.has("LFtempCL") {
+            return Some(TireInfo {
+                left_carcass_temp: self.get_float("LRtempCL").unwrap_or(0.),
+                middle_carcass_temp: self.get_float("LRtempCM").unwrap_or(0.),
+                right_carcass_temp: self.get_float("LRtempCR").unwrap_or(0.),
+                left_surface_temp: self.get_float("LRtempL").unwrap_or(0.),
+                middle_surface_temp: self.get_float("LRtempM").unwrap_or(0.),
+                right_surface_temp: self.get_float("LRtempR").unwrap_or(0.),
+            });
+        }
+        None
+    }
+
+    fn get_rr_tire_info(&self) -> Option<TireInfo> {
+        if self.has("LFtempCL") {
+            return Some(TireInfo {
+                left_carcass_temp: self.get_float("RRtempCL").unwrap_or(0.),
+                middle_carcass_temp: self.get_float("RRtempCM").unwrap_or(0.),
+                right_carcass_temp: self.get_float("RRtempCR").unwrap_or(0.),
+                left_surface_temp: self.get_float("RRtempL").unwrap_or(0.),
+                middle_surface_temp: self.get_float("RRtempM").unwrap_or(0.),
+                right_surface_temp: self.get_float("RRtempR").unwrap_or(0.),
+            });
+        }
+        None
+    }
+}
 
 /// A trait for producing telemetry data that abstracts away
 /// the iRacing client so that we can test collection and analyzers
@@ -101,7 +190,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
 
         Ok(SessionInfo {
             track_name: ir_session_info.weekend.track_name,
-            max_steering_angle: get_float(&telemetry, "SteeringWheelAngleMax"),
+            max_steering_angle: telemetry.get_float("SteeringWheelAngleMax").unwrap_or(0.),
         })
     }
 
@@ -123,33 +212,34 @@ impl TelemetryProducer for IRacingTelemetryProducer {
                 }
             })?;
 
-        let lap_dist_pct: f32 = get_float(&telemetry, "LapDistPct");
-        let lap_no: u32 = get_int(&telemetry, "Lap");
-        let last_lap_time_s: f32 = get_float(&telemetry, "LapLastLapTime");
-        let car_shift_ideal_rpm: f32 = get_float(&telemetry, "PlayerCarSLShiftRPM");
-        let cur_gear: u32 = get_int(&telemetry, "Gear");
-        let cur_rpm: f32 = get_float(&telemetry, "RPM");
-        let cur_speed: f32 = get_float(&telemetry, "Speed");
-        let best_lap_time_s: f32 = get_float(&telemetry, "LapBestLapTime");
-        let throttle: f32 = get_float(&telemetry, "Throttle");
-        let brake: f32 = get_float(&telemetry, "BrakeRaw");
-        let steering: f32 = get_float(&telemetry, "SteeringWheelAngle");
-        let abs_active: bool = get_bool(&telemetry, "BrakeABSactive");
-
         let measurement = TelemetryPoint {
             point_no: self.point_no,
-            lap_dist_pct,
-            lap_no,
-            last_lap_time_s,
-            best_lap_time_s,
-            car_shift_ideal_rpm,
-            cur_gear,
-            cur_rpm,
-            cur_speed,
-            throttle,
-            brake,
-            steering,
-            abs_active,
+            lap_dist_pct: telemetry.get_float("LapDistPct").unwrap_or(0.),
+            lap_no: telemetry.get_int("Lap").unwrap_or(0),
+            last_lap_time_s: telemetry.get_float("LapLastLapTime").unwrap_or(0.),
+            best_lap_time_s: telemetry.get_float("LapBestLapTime").unwrap_or(0.),
+            car_shift_ideal_rpm: telemetry.get_float("PlayerCarSLShiftRPM").unwrap_or(0.),
+            cur_gear: telemetry.get_int("Gear").unwrap_or(0),
+            cur_rpm: telemetry.get_float("RPM").unwrap_or(0.),
+            cur_speed: telemetry.get_float("Speed").unwrap_or(0.),
+            throttle: telemetry.get_float("Throttle").unwrap_or(0.),
+            brake: telemetry.get_float("BrakeRaw").unwrap_or(0.),
+            steering: telemetry.get_float("SteeringWheelAngle").unwrap_or(0.),
+            abs_active: telemetry.get_bool("BrakeABSactive").unwrap_or(false),
+            lat: telemetry.get_float("Lat").unwrap_or(0.),
+            lon: telemetry.get_float("Lon").unwrap_or(0.),
+            lat_accel: telemetry.get_float("LatAccel").unwrap_or(0.),
+            lon_accel: telemetry.get_float("LonAccel").unwrap_or(0.),
+            pitch: telemetry.get_float("Pitch").unwrap_or(0.),
+            pitch_rate: telemetry.get_float("PitchRate").unwrap_or(0.),
+            roll: telemetry.get_float("Roll").unwrap_or(0.),
+            roll_rate: telemetry.get_float("RollRate").unwrap_or(0.),
+            yaw: telemetry.get_float("Yaw").unwrap_or(0.),
+            yaw_rate: telemetry.get_float("YawRate").unwrap_or(0.),
+            lf_tire_info: telemetry.get_lf_tire_info(),
+            rf_tire_info: telemetry.get_rf_tire_info(),
+            lr_tire_info: telemetry.get_lr_tire_info(),
+            rr_tire_info: telemetry.get_rr_tire_info(),
             annotations: HashMap::new(),
         };
         if self.point_no == usize::MAX {
@@ -230,42 +320,4 @@ impl TelemetryProducer for MockTelemetryProducer {
         }
         Ok(self.points[self.cur_tick - 1].clone())
     }
-}
-
-pub(crate) fn get_float(telemetry_sample: &Sample, name: &'static str) -> f32 {
-    telemetry_sample
-        .get(name)
-        .unwrap_or_else(|e| {
-            println!("Error retrieve telemetry sample for {}: {}", name, e);
-            Value::FLOAT(0.)
-        })
-        .try_into()
-        .unwrap_or_else(|e| {
-            println!("Error while parsing float for {}: {}", name, e);
-            0.
-        })
-}
-
-pub(crate) fn get_int(telemetry_sample: &Sample, name: &'static str) -> u32 {
-    telemetry_sample
-        .get(name)
-        .unwrap_or_else(|e| {
-            println!("Error retrieve telemetry sample for {}: {}", name, e);
-            Value::INT(0)
-        })
-        .try_into()
-        .unwrap_or_else(|e| {
-            println!("Error while parsing float for {}: {}", name, e);
-            0
-        })
-}
-
-pub(crate) fn get_bool(telemetry_sample: &Sample, name: &'static str) -> bool {
-    telemetry_sample
-        .get(name)
-        .unwrap_or_else(|e| {
-            println!("Error retrieve telemetry sample for {}: {}", name, e);
-            Value::BOOL(false)
-        })
-        .into()
 }
