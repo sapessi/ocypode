@@ -214,6 +214,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
 
         let measurement = TelemetryPoint {
             point_no: self.point_no,
+            lap_dist: telemetry.get_float("LapDist").unwrap_or(0.),
             lap_dist_pct: telemetry.get_float("LapDistPct").unwrap_or(0.),
             lap_no: telemetry.get_int("Lap").unwrap_or(0),
             last_lap_time_s: telemetry.get_float("LapLastLapTime").unwrap_or(0.),
