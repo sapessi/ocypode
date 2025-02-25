@@ -1,13 +1,26 @@
-use egui::{Align, Id, Image, ImageButton, Layout, Sense, ViewportCommand};
+use egui::{Align, CornerRadius, Frame, Id, Image, ImageButton, Layout, Sense, ViewportCommand};
 
 use crate::telemetry::TelemetryAnnotation;
 
-use super::{config::AlertsLayout, LiveTelemetryApp};
+use super::{
+    config::AlertsLayout, LiveTelemetryApp, DEFAULT_CONTROLS_TRANSPRENCY,
+    DEFAULT_WINDOW_CORNER_RADIUS, DEFAULT_WINDOW_TRANSPARENCY, PALETTE_BLACK,
+};
 
 impl LiveTelemetryApp {
     pub(crate) fn alerts_view(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::TopBottomPanel::top("Controls")
             .min_height(30.)
+            .frame(
+                Frame::new()
+                    .corner_radius(CornerRadius {
+                        nw: DEFAULT_WINDOW_CORNER_RADIUS,
+                        ne: DEFAULT_WINDOW_CORNER_RADIUS,
+                        ..Default::default()
+                    })
+                    .fill(PALETTE_BLACK)
+                    .multiply_with_opacity(DEFAULT_CONTROLS_TRANSPRENCY),
+            )
             .show(ctx, |ui| {
                 let drag_sense = ui.interact(ui.max_rect(), Id::new("window-drag"), Sense::drag());
                 if drag_sense.dragged() {
@@ -41,18 +54,29 @@ impl LiveTelemetryApp {
                     }
                 }
             });
-        egui::CentralPanel::default().show(ctx, |ui| match self.app_config.alerts_layout {
-            AlertsLayout::Vertical => {
-                ui.with_layout(Layout::top_down(Align::TOP), |ui| {
-                    self.show_alerts(ui);
-                });
-            }
-            AlertsLayout::Horizontal => {
-                ui.with_layout(Layout::left_to_right(Align::TOP), |ui| {
-                    self.show_alerts(ui);
-                });
-            }
-        });
+        egui::CentralPanel::default()
+            .frame(
+                Frame::new()
+                    .corner_radius(CornerRadius {
+                        sw: DEFAULT_WINDOW_CORNER_RADIUS,
+                        se: DEFAULT_WINDOW_CORNER_RADIUS,
+                        ..Default::default()
+                    })
+                    .fill(PALETTE_BLACK)
+                    .multiply_with_opacity(DEFAULT_WINDOW_TRANSPARENCY),
+            )
+            .show(ctx, |ui| match self.app_config.alerts_layout {
+                AlertsLayout::Vertical => {
+                    ui.with_layout(Layout::top_down(Align::TOP), |ui| {
+                        self.show_alerts(ui);
+                    });
+                }
+                AlertsLayout::Horizontal => {
+                    ui.with_layout(Layout::left_to_right(Align::TOP), |ui| {
+                        self.show_alerts(ui);
+                    });
+                }
+            });
     }
 
     fn show_alerts(&mut self, ui: &mut egui::Ui) {
@@ -78,17 +102,21 @@ impl LiveTelemetryApp {
                 wheelspin_image = egui::include_image!("../../assets/wheelspin-red.png");
             }
         }
-        ui.with_layout(Layout::top_down(Align::TOP), |ui| {
+        let button_align = match self.app_config.alerts_layout {
+            AlertsLayout::Vertical => Align::Center,
+            AlertsLayout::Horizontal => Align::LEFT,
+        };
+        ui.with_layout(Layout::top_down(button_align), |ui| {
             ui.label("ABS");
             ui.add(Image::new(abs_image));
         });
         ui.separator();
-        ui.with_layout(Layout::top_down(Align::TOP), |ui| {
+        ui.with_layout(Layout::top_down(button_align), |ui| {
             ui.label("Shift");
             ui.add(Image::new(shift_image));
         });
         ui.separator();
-        ui.with_layout(Layout::top_down(Align::TOP), |ui| {
+        ui.with_layout(Layout::top_down(button_align), |ui| {
             ui.label("Traction");
             ui.add(Image::new(wheelspin_image));
         });

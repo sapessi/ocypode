@@ -5,7 +5,7 @@ mod telemetry_view;
 use std::{collections::VecDeque, sync::mpsc::Receiver, time::SystemTime};
 
 use config::AppConfig;
-use egui::{ViewportBuilder, ViewportId};
+use egui::{Color32, CornerRadius, ViewportBuilder, ViewportId, Visuals};
 
 use crate::telemetry::TelemetryPoint;
 
@@ -13,6 +13,16 @@ const REFRESH_RATE_MS: usize = 100;
 pub(crate) const HISTORY_SECONDS: usize = 5;
 const MAX_POINTS_PER_REFRESH: usize = 10;
 const MAX_TIME_PER_REFRESH_MS: u128 = 50;
+
+const PALETTE_BLACK: Color32 = Color32::from_rgb(12, 12, 12);
+const PALETTE_BROWN: Color32 = Color32::from_rgb(72, 30, 20);
+const PALETTE_MAROON: Color32 = Color32::from_rgb(155, 57, 34);
+const PALETTE_ORANGE: Color32 = Color32::from_rgb(242, 97, 63);
+
+const DEFAULT_BUTTON_CORNER_RADIUS: u8 = 4;
+const DEFAULT_WINDOW_CORNER_RADIUS: u8 = 10;
+const DEFAULT_WINDOW_TRANSPARENCY: f32 = 0.75;
+const DEFAULT_CONTROLS_TRANSPRENCY: f32 = 0.85;
 
 /// `LiveTelemetryApp` is an application that displays live telemetry data in a graphical interface.
 ///
@@ -55,6 +65,18 @@ impl eframe::App for LiveTelemetryApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui_extras::install_image_loaders(ctx);
+        let default_visuals = Visuals {
+            dark_mode: true,
+            hyperlink_color: PALETTE_MAROON,
+            faint_bg_color: PALETTE_BLACK,
+            extreme_bg_color: PALETTE_BROWN,
+            window_corner_radius: CornerRadius::same(10),
+            panel_fill: PALETTE_BLACK,
+            button_frame: true,
+            striped: false,
+            ..Default::default()
+        };
+        ctx.set_visuals(default_visuals.clone());
 
         // read telemetry to window
         let start_refresh = SystemTime::now();
@@ -102,6 +124,7 @@ impl eframe::App for LiveTelemetryApp {
                         class == egui::ViewportClass::Immediate,
                         "This egui backend doesn't support multiple viewports"
                     );
+                    ctx.set_visuals(default_visuals.clone());
                     self.alerts_view(ctx, _frame);
                 },
             );
