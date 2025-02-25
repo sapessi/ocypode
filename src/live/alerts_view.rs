@@ -82,7 +82,7 @@ impl LiveTelemetryApp {
     fn show_alerts(&mut self, ui: &mut egui::Ui) {
         // load warning based on telemetry data
         let mut abs_image = egui::include_image!("../../assets/brake-green.png");
-        let mut shift_image = egui::include_image!("../../assets/shift-orange.png");
+        let mut shift_image = egui::include_image!("../../assets/shift-grey.png");
         let mut wheelspin_image = egui::include_image!("../../assets/wheelspin-green.png");
         if let Some(back) = self.telemetry_points.back() {
             if back.brake > 0.4 && !back.abs_active {
@@ -96,6 +96,9 @@ impl LiveTelemetryApp {
                 && back.cur_rpm < back.car_shift_ideal_rpm + 100.
             {
                 shift_image = egui::include_image!("../../assets/shift-green.png");
+            }
+            if back.cur_rpm > back.car_shift_ideal_rpm + 100. {
+                shift_image = egui::include_image!("../../assets/shift-red.png");
             }
 
             if let Some(TelemetryAnnotation::Bool(true)) = back.annotations.get("wheelspin") {
