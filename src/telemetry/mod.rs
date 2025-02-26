@@ -1,8 +1,8 @@
-mod collector;
+pub(crate) mod collector;
 pub(crate) mod producer;
 pub(crate) mod short_shifting_analyzer;
-mod trailbrake_steering_analyzer;
-mod wheelspin_analyzer;
+pub(crate) mod trailbrake_steering_analyzer;
+pub(crate) mod wheelspin_analyzer;
 
 use std::collections::HashMap;
 

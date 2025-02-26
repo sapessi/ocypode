@@ -1,13 +1,20 @@
-use std::{collections::HashMap, sync::mpsc::Sender, thread, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::mpsc::Sender,
+    thread,
+    time::{Duration, SystemTime},
+};
 
 use crate::telemetry::TelemetryPoint;
 
 use crate::OcypodeError;
 
 use super::{
-    producer::TelemetryProducer, short_shifting_analyzer::ShortShiftingAnalyzer,
+    producer::{TelemetryProducer, CONN_RETRY_MAX_WAIT_S},
+    short_shifting_analyzer::ShortShiftingAnalyzer,
     trailbrake_steering_analyzer::TrailbrakeSteeringAnalyzer,
-    wheelspin_analyzer::WheelspinAnalyzer, TelemetryAnalyzer, TelemetryAnnotation,
+    wheelspin_analyzer::WheelspinAnalyzer,
+    TelemetryAnalyzer, TelemetryAnnotation,
 };
 
 const REFRESH_RATE_MS: u64 = 100;
@@ -22,6 +29,24 @@ pub fn collect_telemetry(
     telemetry_writer_sender: Option<Sender<TelemetryPoint>>,
 ) -> Result<(), OcypodeError> {
     producer.start()?;
+
+    // wait for a session to start
+    let session_wait_start = SystemTime::now();
+    loop {
+        if producer.session_info().is_err() {
+            thread::sleep(Duration::from_millis(REFRESH_RATE_MS));
+        } else {
+            break;
+        }
+        if SystemTime::now()
+            .duration_since(session_wait_start)
+            .unwrap()
+            .as_secs()
+            > CONN_RETRY_MAX_WAIT_S
+        {
+            return Err(OcypodeError::IRacingConnectionTimeout);
+        }
+    }
 
     let mut analyzers: Vec<Box<dyn TelemetryAnalyzer>> = vec![
         Box::new(WheelspinAnalyzer::<MIN_WHEELSPIN_POINTS>::new()),

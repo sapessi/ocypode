@@ -11,7 +11,7 @@ use crate::OcypodeError;
 use super::{SessionInfo, TelemetryPoint, TireInfo};
 
 const CONN_RETRY_WAIT_MS: u64 = 200;
-const CONN_RETRY_MAX_WAIT_S: u64 = 600;
+pub(crate) const CONN_RETRY_MAX_WAIT_S: u64 = 600;
 
 pub trait SimplifiedTelemetryAccess {
     fn get_float(&self, name: &'static str) -> Option<f32>;
