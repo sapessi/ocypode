@@ -1,6 +1,6 @@
 use egui::{Align, CornerRadius, Frame, Id, Image, ImageButton, Layout, Sense, ViewportCommand};
 
-use crate::telemetry::TelemetryAnnotation;
+use crate::telemetry::{short_shifting_analyzer::SHORT_SHIFT_ANNOTATION, TelemetryAnnotation};
 
 use super::{
     config::AlertsLayout, LiveTelemetryApp, DEFAULT_CONTROLS_TRANSPRENCY,
@@ -99,6 +99,11 @@ impl LiveTelemetryApp {
             }
             if back.cur_rpm > back.car_shift_ideal_rpm + 100. {
                 shift_image = egui::include_image!("../../assets/shift-red.png");
+            }
+            if let Some(TelemetryAnnotation::Bool(true)) =
+                back.annotations.get(SHORT_SHIFT_ANNOTATION)
+            {
+                shift_image = egui::include_image!("../../assets/shift-orange.png");
             }
 
             if let Some(TelemetryAnnotation::Bool(true)) = back.annotations.get("wheelspin") {

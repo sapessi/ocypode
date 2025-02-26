@@ -1,5 +1,6 @@
 mod collector;
 pub(crate) mod producer;
+pub(crate) mod short_shifting_analyzer;
 mod trailbrake_steering_analyzer;
 mod wheelspin_analyzer;
 

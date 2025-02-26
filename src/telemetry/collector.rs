@@ -5,7 +5,8 @@ use crate::telemetry::TelemetryPoint;
 use crate::OcypodeError;
 
 use super::{
-    producer::TelemetryProducer, trailbrake_steering_analyzer::TrailbrakeSteeringAnalyzer,
+    producer::TelemetryProducer, short_shifting_analyzer::ShortShiftingAnalyzer,
+    trailbrake_steering_analyzer::TrailbrakeSteeringAnalyzer,
     wheelspin_analyzer::WheelspinAnalyzer, TelemetryAnalyzer, TelemetryAnnotation,
 };
 
@@ -28,6 +29,7 @@ pub fn collect_telemetry(
             MAX_TRAILBRAKING_STEERING_ANGLE,
             MIN_TRAILBRAKING_PCT,
         )),
+        Box::new(ShortShiftingAnalyzer::default()),
     ];
 
     loop {
