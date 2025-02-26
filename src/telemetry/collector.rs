@@ -12,16 +12,15 @@ use crate::OcypodeError;
 use super::{
     producer::{TelemetryProducer, CONN_RETRY_MAX_WAIT_S},
     short_shifting_analyzer::ShortShiftingAnalyzer,
-    trailbrake_steering_analyzer::TrailbrakeSteeringAnalyzer,
+    trailbrake_steering_analyzer::{
+        TrailbrakeSteeringAnalyzer, MAX_TRAILBRAKING_STEERING_ANGLE, MIN_TRAILBRAKING_PCT,
+    },
     wheelspin_analyzer::WheelspinAnalyzer,
     TelemetryAnalyzer, TelemetryAnnotation,
 };
 
 const REFRESH_RATE_MS: u64 = 100;
 const MIN_WHEELSPIN_POINTS: usize = 100;
-
-const MIN_TRAILBRAKING_PCT: f32 = 0.2;
-const MAX_TRAILBRAKING_STEERING_ANGLE: f32 = 0.1;
 
 pub fn collect_telemetry(
     mut producer: impl TelemetryProducer,

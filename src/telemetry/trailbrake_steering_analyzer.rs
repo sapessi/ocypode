@@ -2,8 +2,10 @@ use std::collections::HashMap;
 
 use super::{SessionInfo, TelemetryAnalyzer};
 
-pub const TRAILBRAKE_EXCESSIVE_STEERING_ANNOTATION: &str = "excessive_trailbrake_steering";
-pub const TRAILBRAKE_STEERING_PCT_ANNOTATION: &str = "steering_pct";
+pub(crate) const MIN_TRAILBRAKING_PCT: f32 = 0.2;
+pub(crate) const MAX_TRAILBRAKING_STEERING_ANGLE: f32 = 0.1;
+pub(crate) const TRAILBRAKE_EXCESSIVE_STEERING_ANNOTATION: &str = "excessive_trailbrake_steering";
+pub(crate) const TRAILBRAKE_STEERING_PCT_ANNOTATION: &str = "steering_pct";
 
 pub struct TrailbrakeSteeringAnalyzer {
     max_trailbraking_steering_angle: f32,
