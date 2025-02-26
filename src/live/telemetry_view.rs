@@ -95,13 +95,13 @@ impl LiveTelemetryApp {
                 self.telemetry_points.iter().enumerate().all(|p| {
                     throttle_vec.push([p.0 as f64, p.1.throttle as f64 * 100.]);
                     brake_vec.push([p.0 as f64, p.1.brake as f64 * 100.]);
-                    steering_vec.push([p.0 as f64, p.1.steering as f64]);
+                    steering_vec.push([p.0 as f64, 50. + 50. * p.1.steering_pct as f64]);
                     true
                 });
 
                 let throttle_points = PlotPoints::new(throttle_vec);
                 let brake_points = PlotPoints::new(brake_vec);
-                //let steering_points = PlotPoints::new(steering_vec);
+                let steering_points = PlotPoints::new(steering_vec);
 
                 plot.show_background(false).show(ui, |plot_ui| {
                     plot_ui.line(
@@ -125,6 +125,11 @@ impl LiveTelemetryApp {
                             .color(Color32::RED)
                             .fill(0.)
                             .name("Brake"),
+                    );
+                    plot_ui.line(
+                        Line::new(steering_points)
+                            .color(Color32::LIGHT_GRAY)
+                            .name("Steering"),
                     );
                 });
             });

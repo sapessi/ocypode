@@ -55,6 +55,8 @@ pub struct TelemetryPoint {
     pub brake: f32,
     /// Steering wheel angle
     pub steering: f32,
+    // steering angle as a % of max steering
+    pub steering_pct: f32,
     /// Whether ABS is currently active
     pub abs_active: bool,
     /// Latitude in decimal degrees
@@ -102,6 +104,7 @@ impl Default for TelemetryPoint {
             throttle: 0.,
             brake: 0.,
             steering: 0.,
+            steering_pct: 0.,
             abs_active: false,
             lat: 0.,
             lon: 0.,

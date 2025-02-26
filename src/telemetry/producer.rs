@@ -11,6 +11,7 @@ use crate::OcypodeError;
 use super::{SessionInfo, TelemetryPoint, TireInfo};
 
 const CONN_RETRY_WAIT_MS: u64 = 200;
+const MAX_STEERING_ANGLE_DEFAULT: f32 = std::f32::consts::PI;
 pub(crate) const CONN_RETRY_MAX_WAIT_S: u64 = 600;
 
 pub trait SimplifiedTelemetryAccess {
@@ -187,7 +188,6 @@ impl TelemetryProducer for IRacingTelemetryProducer {
                     description: "Could not retrieve telemetry",
                 }
             })?;
-
         Ok(SessionInfo {
             track_name: ir_session_info.weekend.track_name,
             max_steering_angle: telemetry.get_float("SteeringWheelAngleMax").unwrap_or(0.),
@@ -212,6 +212,15 @@ impl TelemetryProducer for IRacingTelemetryProducer {
                 }
             })?;
 
+        let steering_pct = if telemetry.get_float("SteeringWheelAngle").unwrap_or(0.)
+            > MAX_STEERING_ANGLE_DEFAULT
+        {
+            telemetry.get_float("SteeringWheelAngle").unwrap_or(0.)
+                / telemetry.get_float("SteeringWheelAngleMax").unwrap_or(0.)
+        } else {
+            telemetry.get_float("SteeringWheelAngle").unwrap_or(0.) / MAX_STEERING_ANGLE_DEFAULT
+        };
+
         let measurement = TelemetryPoint {
             point_no: self.point_no,
             lap_dist: telemetry.get_float("LapDist").unwrap_or(0.),
@@ -226,6 +235,8 @@ impl TelemetryProducer for IRacingTelemetryProducer {
             throttle: telemetry.get_float("Throttle").unwrap_or(0.),
             brake: telemetry.get_float("BrakeRaw").unwrap_or(0.),
             steering: telemetry.get_float("SteeringWheelAngle").unwrap_or(0.),
+            // this might result in an unhappy division by 0. Do we want to panic in this case because it's unexpected?
+            steering_pct,
             abs_active: telemetry.get_bool("BrakeABSactive").unwrap_or(false),
             lat: telemetry.get_float("Lat").unwrap_or(0.),
             lon: telemetry.get_float("Lon").unwrap_or(0.),
