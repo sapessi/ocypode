@@ -1,6 +1,9 @@
 use egui::{Align, CornerRadius, Frame, Id, Image, ImageButton, Layout, Sense, ViewportCommand};
 
-use crate::telemetry::{short_shifting_analyzer::SHORT_SHIFT_ANNOTATION, TelemetryAnnotation};
+use crate::telemetry::{
+    short_shifting_analyzer::SHORT_SHIFT_ANNOTATION,
+    trailbrake_steering_analyzer::TRAILBRAKE_EXCESSIVE_STEERING_ANNOTATION, TelemetryAnnotation,
+};
 
 use super::{
     config::AlertsLayout, LiveTelemetryApp, DEFAULT_CONTROLS_TRANSPRENCY,
@@ -84,7 +87,9 @@ impl LiveTelemetryApp {
         let mut abs_image = egui::include_image!("../../assets/brake-green.png");
         let mut shift_image = egui::include_image!("../../assets/shift-grey.png");
         let mut wheelspin_image = egui::include_image!("../../assets/wheelspin-green.png");
+        let mut trailbrake_steering_image = egui::include_image!("../../assets/steering-grey.png");
         if let Some(back) = self.telemetry_points.back() {
+            // brake ABS alert
             if back.brake > 0.4 && !back.abs_active {
                 abs_image = egui::include_image!("../../assets/brake-orange.png");
             }
@@ -92,6 +97,7 @@ impl LiveTelemetryApp {
                 abs_image = egui::include_image!("../../assets/brake-red.png");
             }
 
+            // shift timing alert
             if back.cur_rpm > back.car_shift_ideal_rpm - 100.
                 && back.cur_rpm < back.car_shift_ideal_rpm + 100.
             {
@@ -106,8 +112,20 @@ impl LiveTelemetryApp {
                 shift_image = egui::include_image!("../../assets/shift-orange.png");
             }
 
+            // wheelspin alert
             if let Some(TelemetryAnnotation::Bool(true)) = back.annotations.get("wheelspin") {
                 wheelspin_image = egui::include_image!("../../assets/wheelspin-red.png");
+            }
+
+            // trailbrake steering analyzer
+            if back.brake > 0.05 {
+                trailbrake_steering_image = egui::include_image!("../../assets/steering-green.png");
+            }
+            if let Some(TelemetryAnnotation::Bool(true)) = back
+                .annotations
+                .get(TRAILBRAKE_EXCESSIVE_STEERING_ANNOTATION)
+            {
+                trailbrake_steering_image = egui::include_image!("../../assets/steering-red.png");
             }
         }
         let button_align = match self.app_config.alerts_layout {
@@ -127,6 +145,11 @@ impl LiveTelemetryApp {
         ui.with_layout(Layout::top_down(button_align), |ui| {
             ui.label("Traction");
             ui.add(Image::new(wheelspin_image));
+        });
+        ui.separator();
+        ui.with_layout(Layout::top_down(button_align), |ui| {
+            ui.label("Trailbraking");
+            ui.add(Image::new(trailbrake_steering_image));
         });
     }
 }
