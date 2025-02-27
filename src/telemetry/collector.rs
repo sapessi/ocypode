@@ -10,9 +10,14 @@ use crate::telemetry::TelemetryPoint;
 use crate::OcypodeError;
 
 use super::{
-    producer::{TelemetryProducer, CONN_RETRY_MAX_WAIT_S}, short_shifting_analyzer::ShortShiftingAnalyzer, slip_analyzer::SlipAnalyzer, trailbrake_steering_analyzer::{
+    producer::{TelemetryProducer, CONN_RETRY_MAX_WAIT_S},
+    short_shifting_analyzer::ShortShiftingAnalyzer,
+    slip_analyzer::SlipAnalyzer,
+    trailbrake_steering_analyzer::{
         TrailbrakeSteeringAnalyzer, MAX_TRAILBRAKING_STEERING_ANGLE, MIN_TRAILBRAKING_PCT,
-    }, wheelspin_analyzer::WheelspinAnalyzer, TelemetryAnalyzer, TelemetryAnnotation
+    },
+    wheelspin_analyzer::WheelspinAnalyzer,
+    TelemetryAnalyzer, TelemetryAnnotation,
 };
 
 const REFRESH_RATE_MS: u64 = 100;
