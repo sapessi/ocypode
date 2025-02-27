@@ -36,12 +36,10 @@ impl TelemetryAnalyzer for TrailbrakeSteeringAnalyzer {
             return HashMap::new();
         }
 
-        let cur_steering_pct =
-            telemetry_point.steering.abs() / session_info.max_steering_angle.abs();
         // we are braking... measure steering angle
         let mut annotations = HashMap::new();
         if telemetry_point.brake > self.min_trailbraking_pct
-            && cur_steering_pct > self.max_trailbraking_steering_angle
+            && telemetry_point.steering_pct > self.max_trailbraking_steering_angle
         {
             annotations.insert(
                 TRAILBRAKE_EXCESSIVE_STEERING_ANNOTATION.to_string(),
@@ -49,7 +47,7 @@ impl TelemetryAnalyzer for TrailbrakeSteeringAnalyzer {
             );
             annotations.insert(
                 TRAILBRAKE_STEERING_PCT_ANNOTATION.to_string(),
-                super::TelemetryAnnotation::Float(cur_steering_pct),
+                super::TelemetryAnnotation::Float(telemetry_point.steering_pct),
             );
         }
         annotations
@@ -80,6 +78,7 @@ mod tests {
         let point = TelemetryPoint {
             brake: 0.3,
             steering: 0.2,
+            steering_pct: 0.3,
             ..Default::default()
         };
         let session_info = SessionInfo {
@@ -94,9 +93,7 @@ mod tests {
         );
         assert_eq!(
             annotations.get(TRAILBRAKE_STEERING_PCT_ANNOTATION),
-            Some(&TelemetryAnnotation::Float(
-                point.steering.abs() / session_info.max_steering_angle
-            ))
+            Some(&TelemetryAnnotation::Float(0.3)),
         );
     }
 
