@@ -188,9 +188,17 @@ impl TelemetryProducer for IRacingTelemetryProducer {
                     description: "Could not retrieve telemetry",
                 }
             })?;
+
         Ok(SessionInfo {
             track_name: ir_session_info.weekend.track_name,
+            track_configuration: ir_session_info.weekend.track_config_name,
             max_steering_angle: telemetry.get_float("SteeringWheelAngleMax").unwrap_or(0.),
+            track_length: ir_session_info.weekend.track_length,
+            we_series_id: ir_session_info.weekend.series_id,
+            we_session_id: ir_session_info.weekend.session_id,
+            we_season_id: ir_session_info.weekend.season_id,
+            we_sub_session_id: ir_session_info.weekend.sub_session_id,
+            we_league_id: ir_session_info.weekend.league_id,
         })
     }
 
@@ -319,7 +327,14 @@ impl TelemetryProducer for MockTelemetryProducer {
     fn session_info(&mut self) -> Result<SessionInfo, OcypodeError> {
         Ok(SessionInfo {
             track_name: self.track_name.clone(),
+            track_configuration: String::new(),
             max_steering_angle: self.max_steering_angle,
+            track_length: "1.5".to_string(),
+            we_series_id: 0,
+            we_session_id: 0,
+            we_season_id: 0,
+            we_sub_session_id: 0,
+            we_league_id: 0,
         })
     }
 

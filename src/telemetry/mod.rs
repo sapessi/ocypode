@@ -129,14 +129,28 @@ impl Default for TelemetryPoint {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SessionInfo {
     pub track_name: String,
+    pub track_configuration: String,
     pub max_steering_angle: f32,
+    pub track_length: String,
+    pub we_series_id: i32,
+    pub we_session_id: i32,
+    pub we_season_id: i32,
+    pub we_sub_session_id: i32,
+    pub we_league_id: i32,
 }
 
 impl Default for SessionInfo {
     fn default() -> Self {
         Self {
             track_name: "Unknown".to_string(),
+            track_configuration: "Unknown".to_string(),
             max_steering_angle: 0.,
+            track_length: "".to_string(),
+            we_series_id: 0,
+            we_session_id: 0,
+            we_season_id: 0,
+            we_sub_session_id: 0,
+            we_league_id: 0,
         }
     }
 }
