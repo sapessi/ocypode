@@ -272,8 +272,8 @@ impl TelemetryProducer for IRacingTelemetryProducer {
 pub(crate) struct MockTelemetryProducer {
     cur_tick: usize,
     points: Vec<TelemetryPoint>,
-    track_name: String,
-    max_steering_angle: f32,
+    pub track_name: String,
+    pub max_steering_angle: f32,
 }
 
 impl Default for MockTelemetryProducer {
@@ -339,7 +339,7 @@ impl TelemetryProducer for MockTelemetryProducer {
 
     fn telemetry(&mut self) -> Result<TelemetryPoint, OcypodeError> {
         self.cur_tick += 1;
-        if self.points.len() < self.cur_tick {
+        if self.cur_tick > self.points.len() {
             return Err(OcypodeError::TelemetryProducerError {
                 description: "End of points vec",
             });

@@ -115,3 +115,134 @@ fn wait_for_session(producer: &mut impl TelemetryProducer) -> Result<(), Ocypode
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::telemetry::producer::MockTelemetryProducer;
+    use crate::telemetry::{TelemetryOutput, TelemetryPoint};
+    use std::sync::mpsc::{self, Receiver, Sender};
+    use std::thread;
+
+    #[test]
+    fn test_collect_telemetry_with_writer() {
+        let (telemetry_sender, telemetry_receiver): (
+            Sender<TelemetryOutput>,
+            Receiver<TelemetryOutput>,
+        ) = mpsc::channel();
+        let (writer_sender, writer_receiver): (Sender<TelemetryOutput>, Receiver<TelemetryOutput>) =
+            mpsc::channel();
+
+        let points = vec![
+            TelemetryPoint {
+                cur_gear: 2,
+                cur_rpm: 5000.0,
+                car_shift_ideal_rpm: 5200.0,
+                ..Default::default()
+            },
+            TelemetryPoint {
+                cur_gear: 3,
+                cur_rpm: 5100.0,
+                car_shift_ideal_rpm: 5200.0,
+                ..Default::default()
+            },
+        ];
+
+        let mut mock_producer = MockTelemetryProducer::from_points(points);
+        mock_producer.track_name = "Test Track".to_string();
+        mock_producer.max_steering_angle = 720.0;
+
+        let handle = thread::spawn(move || {
+            let _ = collect_telemetry(mock_producer, telemetry_sender, Some(writer_sender));
+        });
+
+        thread::sleep(Duration::from_millis(REFRESH_RATE_MS * 3));
+
+        // Check if session change was sent
+        let session_change = telemetry_receiver.recv().unwrap();
+        if let TelemetryOutput::SessionChange(session_info) = session_change {
+            assert_eq!(session_info.track_name, "Test Track");
+        } else {
+            panic!("Expected SessionChange");
+        }
+
+        // Check if telemetry data points were sent
+        for _ in 0..2 {
+            let data_point = telemetry_receiver.recv().unwrap();
+            if let TelemetryOutput::DataPoint(measurement) = data_point {
+                assert!(measurement.cur_gear == 2 || measurement.cur_gear == 3);
+            } else {
+                panic!("Expected DataPoint");
+            }
+        }
+
+        // Check if writer received the same data
+        let session_change = writer_receiver.recv().unwrap();
+        if let TelemetryOutput::SessionChange(session_info) = session_change {
+            assert_eq!(session_info.track_name, "Test Track");
+        } else {
+            panic!("Expected SessionChange");
+        }
+        for _ in 0..2 {
+            let writer_data_point = writer_receiver.recv().unwrap();
+            if let TelemetryOutput::DataPoint(measurement) = writer_data_point {
+                assert!(measurement.cur_gear == 2 || measurement.cur_gear == 3);
+            } else {
+                panic!("Expected DataPoint: {:?}", writer_data_point);
+            }
+        }
+
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_collect_telemetry_no_writer() {
+        let (telemetry_sender, telemetry_receiver): (
+            Sender<TelemetryOutput>,
+            Receiver<TelemetryOutput>,
+        ) = mpsc::channel();
+
+        let points = vec![
+            TelemetryPoint {
+                cur_gear: 2,
+                cur_rpm: 5000.0,
+                car_shift_ideal_rpm: 5200.0,
+                ..Default::default()
+            },
+            TelemetryPoint {
+                cur_gear: 3,
+                cur_rpm: 5100.0,
+                car_shift_ideal_rpm: 5200.0,
+                ..Default::default()
+            },
+        ];
+
+        let mut mock_producer = MockTelemetryProducer::from_points(points);
+        mock_producer.track_name = "Test Track".to_string();
+        mock_producer.max_steering_angle = 720.0;
+
+        let handle = thread::spawn(move || {
+            let _ = collect_telemetry(mock_producer, telemetry_sender, None);
+        });
+
+        // Check if session change was sent
+        let session_change = telemetry_receiver.recv().unwrap();
+        if let TelemetryOutput::SessionChange(session_info) = session_change {
+            assert_eq!(session_info.track_name, "Test Track");
+        } else {
+            panic!("Expected SessionChange");
+        }
+
+        // Check if telemetry data points were sent
+        for _ in 0..2 {
+            let data_point = telemetry_receiver.recv().unwrap();
+            if let TelemetryOutput::DataPoint(measurement) = data_point {
+                assert!(measurement.cur_gear == 2 || measurement.cur_gear == 3);
+            } else {
+                panic!("Expected DataPoint");
+            }
+        }
+
+        handle.join().unwrap();
+    }
+}
