@@ -5,25 +5,17 @@ use crate::telemetry::{
     trailbrake_steering_analyzer::TRAILBRAKE_EXCESSIVE_STEERING_ANNOTATION, TelemetryAnnotation,
 };
 
-use super::{
-    config::AlertsLayout, LiveTelemetryApp, DEFAULT_CONTROLS_TRANSPRENCY,
-    DEFAULT_WINDOW_CORNER_RADIUS, DEFAULT_WINDOW_TRANSPARENCY, PALETTE_BLACK,
-};
+use super::{config::AlertsLayout, LiveTelemetryApp, DEFAULT_WINDOW_CORNER_RADIUS};
 
 impl LiveTelemetryApp {
     pub(crate) fn alerts_view(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::TopBottomPanel::top("Controls")
             .min_height(30.)
-            .frame(
-                Frame::new()
-                    .corner_radius(CornerRadius {
-                        nw: DEFAULT_WINDOW_CORNER_RADIUS,
-                        ne: DEFAULT_WINDOW_CORNER_RADIUS,
-                        ..Default::default()
-                    })
-                    .fill(PALETTE_BLACK)
-                    .multiply_with_opacity(DEFAULT_CONTROLS_TRANSPRENCY),
-            )
+            .frame(Frame::new().corner_radius(CornerRadius {
+                nw: DEFAULT_WINDOW_CORNER_RADIUS,
+                ne: DEFAULT_WINDOW_CORNER_RADIUS,
+                ..Default::default()
+            }))
             .show(ctx, |ui| {
                 let drag_sense = ui.interact(ui.max_rect(), Id::new("window-drag"), Sense::drag());
                 if drag_sense.dragged() {
@@ -58,16 +50,11 @@ impl LiveTelemetryApp {
                 }
             });
         egui::CentralPanel::default()
-            .frame(
-                Frame::new()
-                    .corner_radius(CornerRadius {
-                        sw: DEFAULT_WINDOW_CORNER_RADIUS,
-                        se: DEFAULT_WINDOW_CORNER_RADIUS,
-                        ..Default::default()
-                    })
-                    .fill(PALETTE_BLACK)
-                    .multiply_with_opacity(DEFAULT_WINDOW_TRANSPARENCY),
-            )
+            .frame(Frame::new().corner_radius(CornerRadius {
+                sw: DEFAULT_WINDOW_CORNER_RADIUS,
+                se: DEFAULT_WINDOW_CORNER_RADIUS,
+                ..Default::default()
+            }))
             .show(ctx, |ui| match self.app_config.alerts_layout {
                 AlertsLayout::Vertical => {
                     ui.with_layout(Layout::top_down(Align::TOP), |ui| {

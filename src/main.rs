@@ -99,7 +99,6 @@ fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError>
     });
     let telemetry_window_position = app_config.telemetry_window_position.clone();
 
-    let app = LiveTelemetryApp::new(telemetry_rx, app_config);
     let mut native_options = eframe::NativeOptions::default();
     native_options.viewport = native_options
         .viewport
@@ -110,9 +109,15 @@ fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError>
         .with_position(telemetry_window_position);
 
     eframe::run_native(
-        "Monitor app",
+        "Ocypode",
         native_options,
-        Box::new(|_| Ok(Box::new(app))),
+        Box::new(|cc| {
+            Ok(Box::new(LiveTelemetryApp::new(
+                telemetry_rx,
+                app_config,
+                cc,
+            )))
+        }),
     )
     .expect("could not start app");
     Ok(())

@@ -4,24 +4,18 @@ use egui::{Color32, CornerRadius, Frame, Id, ImageButton, Layout, Sense, Vec2b, 
 use egui_plot::{Line, PlotPoints};
 
 use super::{
-    LiveTelemetryApp, DEFAULT_BUTTON_CORNER_RADIUS, DEFAULT_CONTROLS_TRANSPRENCY,
-    DEFAULT_WINDOW_CORNER_RADIUS, DEFAULT_WINDOW_TRANSPARENCY, PALETTE_BLACK, PALETTE_ORANGE,
+    LiveTelemetryApp, DEFAULT_BUTTON_CORNER_RADIUS, DEFAULT_WINDOW_CORNER_RADIUS, PALETTE_ORANGE,
 };
 
 impl LiveTelemetryApp {
     pub(crate) fn telemetry_view(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::TopBottomPanel::top("settings")
             .min_height(30.)
-            .frame(
-                Frame::new()
-                    .corner_radius(CornerRadius {
-                        nw: DEFAULT_WINDOW_CORNER_RADIUS,
-                        ne: DEFAULT_WINDOW_CORNER_RADIUS,
-                        ..Default::default()
-                    })
-                    .fill(PALETTE_BLACK)
-                    .multiply_with_opacity(DEFAULT_CONTROLS_TRANSPRENCY),
-            )
+            .frame(Frame::new().corner_radius(CornerRadius {
+                nw: DEFAULT_WINDOW_CORNER_RADIUS,
+                ne: DEFAULT_WINDOW_CORNER_RADIUS,
+                ..Default::default()
+            }))
             .show(ctx, |ui| {
                 let drag_sense = ui.interact(ui.max_rect(), Id::new("window-drag"), Sense::drag());
                 if drag_sense.dragged() {
@@ -67,16 +61,11 @@ impl LiveTelemetryApp {
             });
 
         egui::CentralPanel::default()
-            .frame(
-                Frame::new()
-                    .corner_radius(CornerRadius {
-                        sw: DEFAULT_WINDOW_CORNER_RADIUS,
-                        se: DEFAULT_WINDOW_CORNER_RADIUS,
-                        ..Default::default()
-                    })
-                    .fill(PALETTE_BLACK)
-                    .multiply_with_opacity(DEFAULT_WINDOW_TRANSPARENCY),
-            )
+            .frame(Frame::new().corner_radius(CornerRadius {
+                sw: DEFAULT_WINDOW_CORNER_RADIUS,
+                se: DEFAULT_WINDOW_CORNER_RADIUS,
+                ..Default::default()
+            }))
             .show(ctx, |ui| {
                 let plot = egui_plot::Plot::new("measurements")
                     .allow_drag(false)
