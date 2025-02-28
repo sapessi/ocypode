@@ -4,6 +4,7 @@ use std::{
 };
 
 use iracing::telemetry::{Connection, Sample};
+use log::{error, warn};
 
 use crate::OcypodeError;
 
@@ -146,7 +147,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
                 .as_secs()
                 >= self.retry_timeout_s
             {
-                println!(
+                error!(
                     "Could not create iRacing connection after {} seconds",
                     self.retry_timeout_s
                 );
@@ -171,7 +172,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
             .expect("Missing iRacing connection")
             .session_info()
             .map_err(|e| {
-                println!("Could not retrieve session info: {}", e);
+                warn!("Could not retrieve session info: {}", e);
                 OcypodeError::TelemetryProducerError {
                     description: "Could not retrieve session info",
                 }
@@ -182,7 +183,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
             .expect("Missing iRacing connection")
             .telemetry()
             .map_err(|e| {
-                println!("Could not retrieve telemetry: {}", e);
+                warn!("Could not retrieve telemetry: {}", e);
                 OcypodeError::TelemetryProducerError {
                     description: "Could not retrieve telemetry",
                 }
@@ -213,7 +214,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
             .expect("Missing iRacing connection")
             .telemetry()
             .map_err(|e| {
-                println!("Could not retrieve telemetry: {}", e);
+                error!("Could not retrieve telemetry: {}", e);
                 OcypodeError::TelemetryProducerError {
                     description: "Could not retrieve telemetry",
                 }
@@ -303,7 +304,7 @@ impl MockTelemetryProducer {
             std::fs::File::open(file).map_err(|e| OcypodeError::NoIRacingFile { source: e })?;
         let reader = std::io::BufReader::new(file);
         let points: Vec<TelemetryPoint> = serde_json::from_reader(reader).map_err(|e| {
-            println!("Could not load JSON file: {}", e);
+            error!("Could not load JSON file: {}", e);
             OcypodeError::TelemetryProducerError {
                 description: "Could not load JSON file",
             }

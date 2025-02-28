@@ -5,6 +5,8 @@ use std::{
     sync::mpsc::Receiver,
 };
 
+use log::warn;
+
 use crate::{telemetry::TelemetryOutput, OcypodeError};
 
 pub fn write_telemetry(
@@ -20,7 +22,7 @@ pub fn write_telemetry(
             serde_json::to_string(&point).unwrap()
         )
         .map_err(|e| {
-            println!("Error while writing telemetry point to output file: {}", e);
+            warn!("Error while writing telemetry point to output file: {}", e);
         });
     }
     telemetry_file_writer

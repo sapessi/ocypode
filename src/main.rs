@@ -132,6 +132,9 @@ fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError>
 }
 
 fn main() {
+    #[cfg(debug_assertions)]
+    colog::init();
+
     let cli = Args::parse();
     ctrlc::set_handler(move || {
         println!("Exiting...");

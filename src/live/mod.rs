@@ -6,6 +6,7 @@ use std::{collections::VecDeque, sync::mpsc::Receiver, time::SystemTime};
 
 use config::AppConfig;
 use egui::{style::Widgets, Color32, CornerRadius, ViewportBuilder, ViewportId, Visuals};
+use log::error;
 
 use crate::telemetry::{TelemetryOutput, TelemetryPoint};
 
@@ -82,7 +83,7 @@ impl LiveTelemetryApp {
 impl eframe::App for LiveTelemetryApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         if let Err(e) = self.app_config.save() {
-            println!("Error while saving config file: {}", e);
+            error!("Error while saving config file: {}", e);
         }
     }
 

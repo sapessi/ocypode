@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use egui::{Color32, CornerRadius, Frame, Id, ImageButton, Layout, Sense, Vec2b, ViewportCommand};
 use egui_plot::{Line, PlotPoints};
+use log::debug;
 
 use super::{
     LiveTelemetryApp, DEFAULT_BUTTON_CORNER_RADIUS, DEFAULT_WINDOW_CORNER_RADIUS, PALETTE_ORANGE,
@@ -132,17 +133,17 @@ fn stroke_shade(start: Color32, end: Color32, y: f32) -> Color32 {
         u8::try_from(
             (start.r() as f32 + y * (end.r() as f32 - start.r() as f32)).clamp(0., 255.) as u32,
         )
-        .map_err(|e| println!("{}", e))
+        .map_err(|e| debug!("Error interpolating colors: {}", e))
         .unwrap(),
         u8::try_from(
             (start.g() as f32 + y * (end.g() as f32 - start.g() as f32)).clamp(0., 255.) as u32,
         )
-        .map_err(|e| println!("{}", e))
+        .map_err(|e| debug!("Error interpolating colors: {}", e))
         .unwrap(),
         u8::try_from(
             (start.b() as f32 + y * (end.b() as f32 - start.b() as f32)).clamp(0., 255.) as u32,
         )
-        .map_err(|e| println!("{}", e))
+        .map_err(|e| debug!("Error interpolating colors: {}", e))
         .unwrap(),
     )
 }
