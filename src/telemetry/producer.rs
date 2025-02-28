@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     thread,
     time::{Duration, SystemTime},
 };
@@ -260,7 +259,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
             rf_tire_info: telemetry.get_rf_tire_info(),
             lr_tire_info: telemetry.get_lr_tire_info(),
             rr_tire_info: telemetry.get_rr_tire_info(),
-            annotations: HashMap::new(),
+            ..Default::default()
         };
         if self.point_no == usize::MAX {
             self.point_no = 0;

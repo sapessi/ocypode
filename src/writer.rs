@@ -5,18 +5,15 @@ use std::{
     sync::mpsc::Receiver,
 };
 
-use crate::{telemetry::TelemetryPoint, OcypodeError};
+use crate::{telemetry::TelemetryOutput, OcypodeError};
 
 pub fn write_telemetry(
     file: &PathBuf,
-    telemetry_receiver: Receiver<TelemetryPoint>,
+    telemetry_receiver: Receiver<TelemetryOutput>,
 ) -> Result<(), OcypodeError> {
     let telemetry_file = File::create(file).map_err(|e| OcypodeError::WriterError { source: e })?;
     let mut telemetry_file_writer = BufWriter::new(telemetry_file);
     for point in &telemetry_receiver {
-        if point.cur_gear == 0 {
-            continue;
-        }
         let _ = writeln!(
             telemetry_file_writer,
             "{}",

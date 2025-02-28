@@ -7,7 +7,7 @@ use std::{collections::VecDeque, sync::mpsc::Receiver, time::SystemTime};
 use config::AppConfig;
 use egui::{style::Widgets, Color32, CornerRadius, ViewportBuilder, ViewportId, Visuals};
 
-use crate::telemetry::TelemetryPoint;
+use crate::telemetry::{TelemetryOutput, TelemetryPoint};
 
 const REFRESH_RATE_MS: usize = 100;
 pub(crate) const HISTORY_SECONDS: usize = 5;
@@ -37,7 +37,7 @@ const DEFAULT_WINDOW_TRANSPARENCY: u8 = 191;
 /// * `new` - Creates a new instance of `LiveTelemetryApp`.
 /// * `update` - Updates the application state and renders the UI.
 pub struct LiveTelemetryApp {
-    telemetry_receiver: Receiver<TelemetryPoint>,
+    telemetry_receiver: Receiver<TelemetryOutput>,
     window_size_points: usize,
     telemetry_points: VecDeque<TelemetryPoint>,
     app_config: AppConfig,
@@ -45,7 +45,7 @@ pub struct LiveTelemetryApp {
 
 impl LiveTelemetryApp {
     pub fn new(
-        telemetry_receiver: Receiver<TelemetryPoint>,
+        telemetry_receiver: Receiver<TelemetryOutput>,
         app_config: AppConfig,
         cc: &eframe::CreationContext<'_>,
     ) -> Self {
@@ -92,29 +92,31 @@ impl eframe::App for LiveTelemetryApp {
         // read telemetry to window
         let start_refresh = SystemTime::now();
         // consume a few telemetry points and then exist the loop to avoid blocking the UI
-        for point in self.telemetry_receiver.try_recv().iter().enumerate() {
-            if let Some(last) = self.telemetry_points.back() {
-                if point.1.point_no < last.point_no {
-                    self.telemetry_points.clear()
+        for (cnt, point) in self.telemetry_receiver.try_recv().iter().enumerate() {
+            if let TelemetryOutput::DataPoint(point) = point {
+                if let Some(last) = self.telemetry_points.back() {
+                    if point.point_no < last.point_no {
+                        self.telemetry_points.clear()
+                    }
                 }
-            }
 
-            self.telemetry_points.push_back(point.1.clone());
+                self.telemetry_points.push_back(point.clone());
 
-            while self.telemetry_points.len() >= self.window_size_points
-                && self.telemetry_points.front().is_some()
-            {
-                self.telemetry_points.pop_front();
-            }
+                while self.telemetry_points.len() >= self.window_size_points
+                    && self.telemetry_points.front().is_some()
+                {
+                    self.telemetry_points.pop_front();
+                }
 
-            if point.0 > MAX_POINTS_PER_REFRESH
-                || SystemTime::now()
-                    .duration_since(start_refresh)
-                    .unwrap()
-                    .as_millis()
-                    >= MAX_TIME_PER_REFRESH_MS
-            {
-                break;
+                if cnt > MAX_POINTS_PER_REFRESH
+                    || SystemTime::now()
+                        .duration_since(start_refresh)
+                        .unwrap()
+                        .as_millis()
+                        >= MAX_TIME_PER_REFRESH_MS
+                {
+                    break;
+                }
             }
         }
 

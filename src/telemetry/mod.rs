@@ -5,7 +5,10 @@ pub(crate) mod slip_analyzer;
 pub(crate) mod trailbrake_steering_analyzer;
 pub(crate) mod wheelspin_analyzer;
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 pub use collector::collect_telemetry;
 use serde::{Deserialize, Serialize};
@@ -30,8 +33,15 @@ pub struct TireInfo {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum TelemetryOutput {
+    DataPoint(TelemetryPoint),
+    SessionChange(SessionInfo),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TelemetryPoint {
     pub point_no: usize,
+    pub point_epoch: u128,
     /// Meters traveled from S/F this lap
     pub lap_dist: f32,
     /// Percentage distance around lap
@@ -93,6 +103,10 @@ impl Default for TelemetryPoint {
     fn default() -> Self {
         Self {
             point_no: 0,
+            point_epoch: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis(),
             lap_dist: 0.,
             lap_dist_pct: 0.,
             last_lap_time_s: 0.,

@@ -13,7 +13,7 @@ use clap::{arg, Parser, Subcommand};
 use egui::Vec2;
 use live::{config::AppConfig, LiveTelemetryApp, HISTORY_SECONDS};
 use snafu::Snafu;
-use telemetry::{producer::IRacingTelemetryProducer, TelemetryPoint};
+use telemetry::{producer::IRacingTelemetryProducer, TelemetryOutput};
 
 #[derive(Debug, Snafu)]
 enum OcypodeError {
@@ -28,7 +28,7 @@ enum OcypodeError {
     TelemetryProducerError { description: &'static str },
     #[snafu(display("Error broadcasting telemetry data point"))]
     TelemetryBroadcastError {
-        source: Box<SendError<TelemetryPoint>>,
+        source: Box<SendError<TelemetryOutput>>,
     },
 
     // Errors for the telemetry writer
@@ -42,6 +42,14 @@ enum OcypodeError {
     ConfigIOError { source: io::Error },
     #[snafu(display("Error serializing config file"))]
     ConfigSerializeError { source: serde_json::Error },
+}
+
+impl From<SendError<TelemetryOutput>> for OcypodeError {
+    fn from(value: SendError<TelemetryOutput>) -> Self {
+        OcypodeError::TelemetryBroadcastError {
+            source: Box::new(value),
+        }
+    }
 }
 
 #[derive(Parser, Debug)]
@@ -68,13 +76,13 @@ enum Commands {
 }
 
 fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError> {
-    let (telemtry_tx, telemetry_rx) = mpsc::channel::<telemetry::TelemetryPoint>();
+    let (telemtry_tx, telemetry_rx) = mpsc::channel::<telemetry::TelemetryOutput>();
 
     // if we need to write an output file we create a new channel and have the telemetry reader send to both the plotting
     // and writer channels
     if let Some(output_file) = output {
         let (telemetry_writer_tx, telemetry_writer_rx) =
-            mpsc::channel::<telemetry::TelemetryPoint>();
+            mpsc::channel::<telemetry::TelemetryOutput>();
         thread::spawn(move || {
             let telemetry_producer = IRacingTelemetryProducer::default();
             telemetry::collect_telemetry(
