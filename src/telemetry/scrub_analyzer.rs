@@ -65,3 +65,112 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for ScrubAnalyzer<WINDOW_SIZE> 
         output
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::telemetry::{SessionInfo, TelemetryAnnotation, TelemetryPoint};
+
+    #[test]
+    fn test_scrub_annotation_inserted() {
+        let mut analyzer = ScrubAnalyzer::<5>::new(5);
+        let telemetry_point = TelemetryPoint {
+            steering_pct: 0.2,
+            brake: 0.5,
+            throttle: 0.3,
+            yaw_rate: 0.1,
+            ..Default::default()
+        };
+        let session_info = SessionInfo::default();
+
+        // Add enough samples to reach the minimum points threshold
+        for _ in 0..5 {
+            analyzer.analyze(&telemetry_point, &session_info);
+        }
+
+        let scrub_telemetry_point = TelemetryPoint {
+            steering_pct: 0.5,
+            brake: 0.5,
+            throttle: 0.3,
+            yaw_rate: 0.04,
+            ..Default::default()
+        };
+        let output = analyzer.analyze(&scrub_telemetry_point, &session_info);
+        assert!(output.contains_key(SCRUBBING_YAW_RATE_ANNOTATION));
+        assert!(output.contains_key(YAW_RATE_CHANGE_ANNOTATION));
+        assert!(output.contains_key(SCRUBBING_ANNOTATION));
+        assert_eq!(
+            output[SCRUBBING_ANNOTATION],
+            TelemetryAnnotation::Bool(true)
+        );
+    }
+
+    #[test]
+    fn test_no_scrub_annotation_due_to_insufficient_points() {
+        let mut analyzer = ScrubAnalyzer::<10>::new(5);
+        let telemetry_point = TelemetryPoint {
+            steering_pct: 0.2,
+            brake: 0.5,
+            throttle: 0.3,
+            yaw_rate: 0.1,
+            ..Default::default()
+        };
+        let session_info = SessionInfo::default();
+
+        // Add fewer samples than the minimum points threshold
+        for _ in 0..4 {
+            analyzer.analyze(&telemetry_point, &session_info);
+        }
+
+        let output = analyzer.analyze(&telemetry_point, &session_info);
+        assert!(!output.contains_key(SCRUBBING_YAW_RATE_ANNOTATION));
+        assert!(!output.contains_key(YAW_RATE_CHANGE_ANNOTATION));
+        assert!(!output.contains_key(SCRUBBING_ANNOTATION));
+    }
+
+    #[test]
+    fn test_no_scrub_annotation_due_to_low_steering() {
+        let mut analyzer = ScrubAnalyzer::<10>::new(5);
+        let telemetry_point = TelemetryPoint {
+            steering_pct: 0.05,
+            brake: 0.5,
+            throttle: 0.3,
+            yaw_rate: 0.1,
+            ..Default::default()
+        };
+        let session_info = SessionInfo::default();
+
+        // Add enough samples to reach the minimum points threshold
+        for _ in 0..5 {
+            analyzer.analyze(&telemetry_point, &session_info);
+        }
+
+        let output = analyzer.analyze(&telemetry_point, &session_info);
+        assert!(!output.contains_key(SCRUBBING_YAW_RATE_ANNOTATION));
+        assert!(!output.contains_key(YAW_RATE_CHANGE_ANNOTATION));
+        assert!(!output.contains_key(SCRUBBING_ANNOTATION));
+    }
+
+    #[test]
+    fn test_no_scrub_annotation_due_to_high_throttle() {
+        let mut analyzer = ScrubAnalyzer::<10>::new(5);
+        let telemetry_point = TelemetryPoint {
+            steering_pct: 0.2,
+            brake: 0.1,
+            throttle: 0.5,
+            yaw_rate: 0.1,
+            ..Default::default()
+        };
+        let session_info = SessionInfo::default();
+
+        // Add enough samples to reach the minimum points threshold
+        for _ in 0..5 {
+            analyzer.analyze(&telemetry_point, &session_info);
+        }
+
+        let output = analyzer.analyze(&telemetry_point, &session_info);
+        assert!(!output.contains_key(SCRUBBING_YAW_RATE_ANNOTATION));
+        assert!(!output.contains_key(YAW_RATE_CHANGE_ANNOTATION));
+        assert!(!output.contains_key(SCRUBBING_ANNOTATION));
+    }
+}
