@@ -24,8 +24,10 @@ enum OcypodeError {
     IRacingConnectionTimeout,
 
     // Errors while reading and broadcasting telemetry data
+    #[snafu(display("Missing iRacing client, session not initialized"))]
+    MissingIRacingSession,
     #[snafu(display("Telemetry point producer error"))]
-    TelemetryProducerError { description: &'static str },
+    TelemetryProducerError { description: String },
     #[snafu(display("Error broadcasting telemetry data point"))]
     TelemetryBroadcastError {
         source: Box<SendError<TelemetryOutput>>,

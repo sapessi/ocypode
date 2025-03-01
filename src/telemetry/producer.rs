@@ -163,7 +163,8 @@ impl TelemetryProducer for IRacingTelemetryProducer {
     fn session_info(&mut self) -> Result<SessionInfo, OcypodeError> {
         if self.client.is_none() {
             return Err(OcypodeError::TelemetryProducerError {
-                description: "The iRacing connection is not initialized, call start() first.",
+                description: "The iRacing connection is not initialized, call start() first."
+                    .to_string(),
             });
         }
         let ir_session_info = self
@@ -174,7 +175,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
             .map_err(|e| {
                 warn!("Could not retrieve session info: {}", e);
                 OcypodeError::TelemetryProducerError {
-                    description: "Could not retrieve session info",
+                    description: format!("Could not retrieve session info: {}", e),
                 }
             })?;
         let telemetry = self
@@ -185,7 +186,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
             .map_err(|e| {
                 warn!("Could not retrieve telemetry: {}", e);
                 OcypodeError::TelemetryProducerError {
-                    description: "Could not retrieve telemetry",
+                    description: format!("Could not retrieve telemetry: {}", e),
                 }
             })?;
 
@@ -205,21 +206,21 @@ impl TelemetryProducer for IRacingTelemetryProducer {
     fn telemetry(&mut self) -> Result<TelemetryPoint, OcypodeError> {
         if self.client.is_none() {
             return Err(OcypodeError::TelemetryProducerError {
-                description: "The iRacing connection is not initialized, call start() first.",
+                description: "The iRacing connection is not initialized, call start() first."
+                    .to_string(),
             });
         }
         let telemetry = self
             .client
             .as_ref()
-            .expect("Missing iRacing connection")
+            .ok_or(OcypodeError::MissingIRacingSession)?
             .telemetry()
             .map_err(|e| {
                 error!("Could not retrieve telemetry: {}", e);
                 OcypodeError::TelemetryProducerError {
-                    description: "Could not retrieve telemetry",
+                    description: format!("Could not retrieve telemetry: {}", e),
                 }
             })?;
-
         let steering_pct = if telemetry.get_float("SteeringWheelAngle").unwrap_or(0.)
             > MAX_STEERING_ANGLE_DEFAULT
         {
@@ -306,7 +307,7 @@ impl MockTelemetryProducer {
         let points: Vec<TelemetryPoint> = serde_json::from_reader(reader).map_err(|e| {
             error!("Could not load JSON file: {}", e);
             OcypodeError::TelemetryProducerError {
-                description: "Could not load JSON file",
+                description: format!("Could not load JSON file: {}", e),
             }
         })?;
 
@@ -342,7 +343,7 @@ impl TelemetryProducer for MockTelemetryProducer {
         self.cur_tick += 1;
         if self.cur_tick > self.points.len() {
             return Err(OcypodeError::TelemetryProducerError {
-                description: "End of points vec",
+                description: "End of points vec".to_string(),
             });
         }
         Ok(self.points[self.cur_tick - 1].clone())
