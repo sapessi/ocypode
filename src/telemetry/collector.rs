@@ -9,6 +9,7 @@ use crate::OcypodeError;
 
 use super::{
     producer::{TelemetryProducer, CONN_RETRY_MAX_WAIT_S},
+    scrub_analyzer::ScrubAnalyzer,
     short_shifting_analyzer::ShortShiftingAnalyzer,
     slip_analyzer::SlipAnalyzer,
     trailbrake_steering_analyzer::{
@@ -39,6 +40,7 @@ pub fn collect_telemetry(
         )),
         Box::new(ShortShiftingAnalyzer::default()),
         Box::new(SlipAnalyzer::default()),
+        Box::new(ScrubAnalyzer::<100>::new(100)), // TODO: The maximum number of points should be dynamic based on the length of the track
     ];
 
     // if we cannot fetch session info at this point something has gone really wrong.
