@@ -16,8 +16,8 @@ pub(crate) enum AlertsLayout {
 impl AlertsLayout {
     pub(crate) fn window_size(&self) -> Vec2 {
         match self {
-            Self::Vertical => Vec2::new(80., 600.),
-            Self::Horizontal => Vec2::new(600., 100.),
+            Self::Vertical => Vec2::new(70., 500.),
+            Self::Horizontal => Vec2::new(360., 100.),
         }
     }
 }
