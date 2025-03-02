@@ -29,6 +29,7 @@ impl TelemetryAnalyzer for ShortShiftingAnalyzer {
     ) -> std::collections::HashMap<String, super::TelemetryAnnotation> {
         let mut output = HashMap::new();
         if self.prev_rpm > 0.
+            && self.prev_gear > 0
             && telemetry_point.cur_gear > self.prev_gear
             && self.prev_rpm < telemetry_point.car_shift_ideal_rpm - self.sensitivity
         {
@@ -38,8 +39,11 @@ impl TelemetryAnalyzer for ShortShiftingAnalyzer {
             );
         }
 
-        self.prev_gear = telemetry_point.cur_gear;
-        self.prev_rpm = telemetry_point.cur_rpm;
+        // skip double-clutching from short-shifting
+        if telemetry_point.cur_gear > 0 {
+            self.prev_gear = telemetry_point.cur_gear;
+            self.prev_rpm = telemetry_point.cur_rpm;
+        }
         output
     }
 }
