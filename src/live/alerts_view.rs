@@ -1,7 +1,8 @@
 use egui::{Align, CornerRadius, Frame, Id, Image, ImageButton, Layout, Sense, ViewportCommand};
 
 use crate::telemetry::{
-    short_shifting_analyzer::SHORT_SHIFT_ANNOTATION, slip_analyzer::SLIP_ANNOTATION,
+    scrub_analyzer::SCRUBBING_ANNOTATION, short_shifting_analyzer::SHORT_SHIFT_ANNOTATION,
+    slip_analyzer::SLIP_ANNOTATION,
     trailbrake_steering_analyzer::TRAILBRAKE_EXCESSIVE_STEERING_ANNOTATION, TelemetryAnnotation,
 };
 
@@ -75,7 +76,7 @@ impl LiveTelemetryApp {
         let mut shift_image = egui::include_image!("../../assets/shift-grey.png");
         let mut wheelspin_image = egui::include_image!("../../assets/wheelspin-green.png");
         let mut trailbrake_steering_image = egui::include_image!("../../assets/steering-grey.png");
-        let mut slip_image = egui::include_image!("../../assets/slip-grey.png");
+        let mut turn_image = egui::include_image!("../../assets/turn-grey.png");
         if let Some(back) = self.telemetry_points.back() {
             // brake ABS alert
             if back.brake > 0.4 && !back.abs_active {
@@ -116,9 +117,14 @@ impl LiveTelemetryApp {
                 trailbrake_steering_image = egui::include_image!("../../assets/steering-red.png");
             }
 
-            // slip alert
+            // slip/scrub alert
+            if let Some(TelemetryAnnotation::Bool(true)) =
+                back.annotations.get(SCRUBBING_ANNOTATION)
+            {
+                turn_image = egui::include_image!("../../assets/turn-scrub-red.png")
+            }
             if let Some(TelemetryAnnotation::Bool(true)) = back.annotations.get(SLIP_ANNOTATION) {
-                slip_image = egui::include_image!("../../assets/slip-red.png");
+                turn_image = egui::include_image!("../../assets/turn-slip-red.png");
             }
         }
         let button_align = match self.app_config.alerts_layout {
@@ -147,7 +153,7 @@ impl LiveTelemetryApp {
         ui.separator();
         ui.with_layout(Layout::top_down(button_align), |ui| {
             ui.label("Slip");
-            ui.add(Image::new(slip_image));
+            ui.add(Image::new(turn_image));
         });
     }
 }
