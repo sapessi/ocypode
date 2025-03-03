@@ -6,8 +6,8 @@ use std::{collections::VecDeque, sync::mpsc::Receiver, time::SystemTime};
 
 use config::AppConfig;
 use egui::{
-    style::Widgets, Align, Color32, CornerRadius, Image, Layout, Ui, ViewportBuilder, ViewportId,
-    Visuals,
+    style::Widgets, Align, Color32, CornerRadius, Image, Layout, RichText, Ui, ViewportBuilder,
+    ViewportId, Visuals,
 };
 use log::error;
 
@@ -74,7 +74,7 @@ impl ScrubSlipAlert {
 
     fn show(&mut self, ui: &mut Ui, button_align: Align) {
         let mut turn_image = egui::include_image!("../../assets/turn-grey.png");
-
+        let mut text = "slip";
         if SystemTime::now()
             .duration_since(self.alert_start_time)
             .unwrap()
@@ -83,13 +83,16 @@ impl ScrubSlipAlert {
         {
             if self.is_slip {
                 turn_image = egui::include_image!("../../assets/turn-slip-red.png");
+                text = "Slip";
             }
             if self.is_scrub {
                 turn_image = egui::include_image!("../../assets/turn-scrub-red.png");
+                text = "Scrub";
             }
         }
+
         ui.with_layout(Layout::top_down(button_align), |ui| {
-            ui.label("Slip");
+            ui.label(RichText::new(text).color(Color32::WHITE));
             ui.add(Image::new(turn_image));
         });
     }

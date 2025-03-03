@@ -1,4 +1,7 @@
-use egui::{Align, CornerRadius, Frame, Id, Image, ImageButton, Layout, Sense, ViewportCommand};
+use egui::{
+    Align, Color32, CornerRadius, Frame, Id, Image, ImageButton, Layout, RichText, Sense,
+    ViewportCommand,
+};
 
 use crate::telemetry::TelemetryAnnotation;
 
@@ -147,22 +150,22 @@ impl LiveTelemetryApp {
             AlertsLayout::Horizontal => Align::LEFT,
         };
         ui.with_layout(Layout::top_down(button_align), |ui| {
-            ui.label("ABS");
+            ui.label(RichText::new("ABS").color(Color32::WHITE));
             ui.add(Image::new(abs_image));
         });
         ui.separator();
         ui.with_layout(Layout::top_down(button_align), |ui| {
-            ui.label("Shift");
+            ui.label(RichText::new("Shift").color(Color32::WHITE));
             ui.add(Image::new(shift_image));
         });
         ui.separator();
         ui.with_layout(Layout::top_down(button_align), |ui| {
-            ui.label("Traction");
+            ui.label(RichText::new("Traction").color(Color32::WHITE));
             ui.add(Image::new(wheelspin_image));
         });
         ui.separator();
         ui.with_layout(Layout::top_down(button_align), |ui| {
-            ui.label("Trailbraking");
+            ui.label(RichText::new("Trailbraking").color(Color32::WHITE));
             ui.add(Image::new(trailbrake_steering_image));
         });
         ui.separator();
