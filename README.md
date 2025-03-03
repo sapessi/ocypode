@@ -2,6 +2,8 @@
 
 I like Rust and I like sim racing. These two passions meet in this little project to read iRacing telemetry, display it live, and provide helpful alerts to improve driving skills in real-time. In case you are wondering, [Ocypodes are the fastest crabs](https://en.wikipedia.org/wiki/Ocypode).
 
+![Screenshot](/screenshots/mazda_slip.png)
+
 ## Why Ocypode
 There are lots of telemetry overlays out there. However, I couldn't find one that **(1) gave you a real-time, intuitive view of your driving errors, and (2) didn't require some sort of paid subscription.**
 
