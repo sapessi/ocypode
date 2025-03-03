@@ -6,8 +6,8 @@ use std::{collections::VecDeque, sync::mpsc::Receiver, time::SystemTime};
 
 use config::AppConfig;
 use egui::{
-    style::Widgets, Align, Color32, CornerRadius, Image, Layout, RichText, Ui, ViewportBuilder,
-    ViewportId, Visuals,
+    style::Widgets, Align, Color32, Image, Layout, RichText, Ui, ViewportBuilder, ViewportId,
+    Visuals,
 };
 use log::error;
 
@@ -130,7 +130,6 @@ impl LiveTelemetryApp {
             hyperlink_color: PALETTE_MAROON,
             faint_bg_color: PALETTE_BLACK,
             extreme_bg_color: PALETTE_BROWN,
-            window_corner_radius: CornerRadius::same(DEFAULT_BUTTON_CORNER_RADIUS),
             panel_fill: PALETTE_BLACK,
             button_frame: true,
             window_fill: Color32::from_rgba_premultiplied(
