@@ -1,11 +1,7 @@
-use std::collections::HashMap;
-
 use super::{SessionInfo, TelemetryAnalyzer};
 
 pub(crate) const MIN_TRAILBRAKING_PCT: f32 = 0.2;
 pub(crate) const MAX_TRAILBRAKING_STEERING_ANGLE: f32 = 0.1;
-pub(crate) const TRAILBRAKE_EXCESSIVE_STEERING_ANNOTATION: &str = "excessive_trailbrake_steering";
-pub(crate) const TRAILBRAKE_STEERING_PCT_ANNOTATION: &str = "steering_pct";
 
 pub struct TrailbrakeSteeringAnalyzer {
     max_trailbraking_steering_angle: f32,
@@ -26,31 +22,27 @@ impl TelemetryAnalyzer for TrailbrakeSteeringAnalyzer {
         &mut self,
         telemetry_point: &super::TelemetryPoint,
         session_info: &SessionInfo,
-    ) -> std::collections::HashMap<String, super::TelemetryAnnotation> {
+    ) -> Vec<super::TelemetryAnnotation> {
+        let mut output = Vec::new();
         // nothing to process here if we cannot establish the current steering pct
         if session_info.max_steering_angle == 0. {
-            return HashMap::new();
+            return output;
         }
         // this should not be possible
         if telemetry_point.steering > session_info.max_steering_angle {
-            return HashMap::new();
+            return output;
         }
 
         // we are braking... measure steering angle
-        let mut annotations = HashMap::new();
         if telemetry_point.brake > self.min_trailbraking_pct
             && telemetry_point.steering_pct > self.max_trailbraking_steering_angle
         {
-            annotations.insert(
-                TRAILBRAKE_EXCESSIVE_STEERING_ANNOTATION.to_string(),
-                super::TelemetryAnnotation::Bool(true),
-            );
-            annotations.insert(
-                TRAILBRAKE_STEERING_PCT_ANNOTATION.to_string(),
-                super::TelemetryAnnotation::Float(telemetry_point.steering_pct),
-            );
+            output.push(super::TelemetryAnnotation::TrailbrakeSteering {
+                cur_trailbrake_steering: telemetry_point.steering_pct,
+                is_excessive_trailbrake_steering: true,
+            });
         }
-        annotations
+        output
     }
 }
 
@@ -86,14 +78,13 @@ mod tests {
             ..Default::default()
         };
         let annotations = analyzer.analyze(&point, &session_info);
-        assert_eq!(annotations.len(), 2);
+        assert_eq!(annotations.len(), 1);
         assert_eq!(
-            annotations.get(TRAILBRAKE_EXCESSIVE_STEERING_ANNOTATION),
-            Some(&TelemetryAnnotation::Bool(true))
-        );
-        assert_eq!(
-            annotations.get(TRAILBRAKE_STEERING_PCT_ANNOTATION),
-            Some(&TelemetryAnnotation::Float(0.3)),
+            *annotations.get(0).unwrap(),
+            TelemetryAnnotation::TrailbrakeSteering {
+                cur_trailbrake_steering: 0.3,
+                is_excessive_trailbrake_steering: true
+            }
         );
     }
 

@@ -1,9 +1,6 @@
-use std::collections::HashMap;
-
 use super::TelemetryAnalyzer;
 
 pub(crate) const STEERING_ANGLE_DEADZONE_RAD: f32 = 0.08;
-pub(crate) const SLIP_ANNOTATION: &str = "slip";
 
 #[derive(Default)]
 pub(crate) struct SlipAnalyzer {
@@ -18,18 +15,19 @@ impl TelemetryAnalyzer for SlipAnalyzer {
         &mut self,
         telemetry_point: &super::TelemetryPoint,
         _session_info: &super::SessionInfo,
-    ) -> std::collections::HashMap<String, super::TelemetryAnnotation> {
-        let mut output = HashMap::new();
+    ) -> Vec<super::TelemetryAnnotation> {
+        let mut output = Vec::new();
 
         if telemetry_point.brake == 0.
             && telemetry_point.throttle >= self.prev_throttle
             && telemetry_point.steering > STEERING_ANGLE_DEADZONE_RAD
             && telemetry_point.cur_speed < self.prev_speed
         {
-            output.insert(
-                SLIP_ANNOTATION.to_string(),
-                super::TelemetryAnnotation::Bool(true),
-            );
+            output.push(super::TelemetryAnnotation::Slip {
+                prev_speed: self.prev_speed,
+                cur_speed: telemetry_point.cur_speed,
+                is_slip: true,
+            });
         }
 
         self.prev_throttle = telemetry_point.throttle;
@@ -63,8 +61,15 @@ mod tests {
         analyzer.prev_speed = 55.0;
 
         let output = analyzer.analyze(&telemetry_point, &session_info);
-        assert!(output.contains_key(SLIP_ANNOTATION));
-        assert_eq!(output[SLIP_ANNOTATION], TelemetryAnnotation::Bool(true));
+        assert_eq!(output.len(), 1);
+        assert!(match output.get(0).unwrap() {
+            TelemetryAnnotation::Slip {
+                prev_speed: _,
+                cur_speed: _,
+                is_slip,
+            } => *is_slip,
+            _ => false,
+        });
     }
 
     #[test]
@@ -84,7 +89,7 @@ mod tests {
         analyzer.prev_speed = 55.0;
 
         let output = analyzer.analyze(&telemetry_point, &session_info);
-        assert!(!output.contains_key(SLIP_ANNOTATION));
+        assert!(output.is_empty());
     }
 
     #[test]
@@ -104,7 +109,7 @@ mod tests {
         analyzer.prev_speed = 55.0;
 
         let output = analyzer.analyze(&telemetry_point, &session_info);
-        assert!(!output.contains_key(SLIP_ANNOTATION));
+        assert!(output.is_empty());
     }
 
     #[test]
@@ -124,6 +129,6 @@ mod tests {
         analyzer.prev_speed = 55.0;
 
         let output = analyzer.analyze(&telemetry_point, &session_info);
-        assert!(!output.contains_key(SLIP_ANNOTATION));
+        assert!(output.is_empty());
     }
 }

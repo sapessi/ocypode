@@ -44,6 +44,10 @@ enum OcypodeError {
     ConfigIOError { source: io::Error },
     #[snafu(display("Error serializing config file"))]
     ConfigSerializeError { source: serde_json::Error },
+
+    // UI errors
+    #[snafu(display("Invalid telemetry annotation"))]
+    InvalidTelemetryAnnotation,
 }
 
 impl From<SendError<TelemetryOutput>> for OcypodeError {

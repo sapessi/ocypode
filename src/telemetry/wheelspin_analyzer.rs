@@ -26,13 +26,9 @@ impl<const WINDOW_SIZE: usize> WheelspinAnalyzer<WINDOW_SIZE> {
 }
 
 impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for WheelspinAnalyzer<WINDOW_SIZE> {
-    fn analyze(
-        &mut self,
-        point: &TelemetryPoint,
-        _: &SessionInfo,
-    ) -> HashMap<String, TelemetryAnnotation> {
+    fn analyze(&mut self, point: &TelemetryPoint, _: &SessionInfo) -> Vec<TelemetryAnnotation> {
         // process expected RPM growth by gear
-        let mut output: HashMap<String, TelemetryAnnotation> = HashMap::new();
+        let mut output = Vec::new();
         if point.cur_gear != self.prev_gear {
             self.prev_gear = point.cur_gear;
         } else {
@@ -43,15 +39,12 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for WheelspinAnalyzer<WINDOW_SI
                     if rpm_growth > *cur_average
                         && *self.cur_gear_points.entry(point.cur_gear).or_insert(0) >= WINDOW_SIZE
                     {
-                        output.insert("wheelspin".to_string(), TelemetryAnnotation::Bool(true));
-                        output.insert(
-                            "rpm_change".to_string(),
-                            TelemetryAnnotation::Float(rpm_growth),
-                        );
-                        output.insert(
-                            "rpm_grpwth_avgs".to_string(),
-                            TelemetryAnnotation::NumberMap(self.cur_averages.clone()),
-                        );
+                        output.push(TelemetryAnnotation::Wheelspin {
+                            avg_rpm_increase_per_gear: self.cur_averages.clone(),
+                            cur_gear: point.cur_gear,
+                            cur_rpm_increase: rpm_growth,
+                            is_wheelspin: true,
+                        });
                     }
                 }
                 // we only add a data point to our average if the user is in full acceleration

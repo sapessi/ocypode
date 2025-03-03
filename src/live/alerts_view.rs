@@ -1,10 +1,6 @@
 use egui::{Align, CornerRadius, Frame, Id, Image, ImageButton, Layout, Sense, ViewportCommand};
 
-use crate::telemetry::{
-    scrub_analyzer::SCRUBBING_ANNOTATION, short_shifting_analyzer::SHORT_SHIFT_ANNOTATION,
-    slip_analyzer::SLIP_ANNOTATION,
-    trailbrake_steering_analyzer::TRAILBRAKE_EXCESSIVE_STEERING_ANNOTATION, TelemetryAnnotation,
-};
+use crate::telemetry::TelemetryAnnotation;
 
 use super::{config::AlertsLayout, LiveTelemetryApp, DEFAULT_WINDOW_CORNER_RADIUS};
 
@@ -76,7 +72,7 @@ impl LiveTelemetryApp {
         let mut shift_image = egui::include_image!("../../assets/shift-grey.png");
         let mut wheelspin_image = egui::include_image!("../../assets/wheelspin-green.png");
         let mut trailbrake_steering_image = egui::include_image!("../../assets/steering-grey.png");
-        let mut turn_image = egui::include_image!("../../assets/turn-grey.png");
+
         if let Some(back) = self.telemetry_points.back() {
             // brake ABS alert
             if back.brake > 0.4 && !back.abs_active {
@@ -85,7 +81,10 @@ impl LiveTelemetryApp {
             if back.abs_active {
                 abs_image = egui::include_image!("../../assets/brake-red.png");
             }
-
+            // trailbrake steering analyzer
+            if back.brake > 0.05 {
+                trailbrake_steering_image = egui::include_image!("../../assets/steering-green.png");
+            }
             // shift timing alert
             if back.cur_rpm > back.car_shift_ideal_rpm - 100.
                 && back.cur_rpm < back.car_shift_ideal_rpm + 100.
@@ -95,37 +94,53 @@ impl LiveTelemetryApp {
             if back.cur_rpm > back.car_shift_ideal_rpm + 100. {
                 shift_image = egui::include_image!("../../assets/shift-red.png");
             }
-            if let Some(TelemetryAnnotation::Bool(true)) =
-                back.annotations.get(SHORT_SHIFT_ANNOTATION)
-            {
-                shift_image = egui::include_image!("../../assets/shift-orange.png");
+            for annotation in &back.annotations {
+                match annotation {
+                    TelemetryAnnotation::ShortShifting {
+                        gear_change_rpm: _,
+                        optimal_rpm: _,
+                        is_short_shifting,
+                    } => {
+                        if *is_short_shifting {
+                            shift_image = egui::include_image!("../../assets/shift-orange.png");
+                        }
+                    }
+                    TelemetryAnnotation::TrailbrakeSteering {
+                        cur_trailbrake_steering: _,
+                        is_excessive_trailbrake_steering,
+                    } => {
+                        if *is_excessive_trailbrake_steering {
+                            trailbrake_steering_image =
+                                egui::include_image!("../../assets/steering-red.png");
+                        }
+                    }
+                    TelemetryAnnotation::Wheelspin {
+                        avg_rpm_increase_per_gear: _,
+                        cur_gear: _,
+                        cur_rpm_increase: _,
+                        is_wheelspin,
+                    } => {
+                        if *is_wheelspin {
+                            wheelspin_image =
+                                egui::include_image!("../../assets/wheelspin-red.png");
+                        }
+                    }
+                    TelemetryAnnotation::Slip {
+                        prev_speed: _,
+                        cur_speed: _,
+                        is_slip: _,
+                    } => {
+                        _ = self.scrub_slip_alert.update_state(annotation.clone());
+                    }
+                    TelemetryAnnotation::Scrub {
+                        avg_yaw_rate_change: _,
+                        cur_yaw_rate_change: _,
+                        is_scrubbing: _,
+                    } => _ = self.scrub_slip_alert.update_state(annotation.clone()),
+                }
             }
 
-            // wheelspin alert
-            if let Some(TelemetryAnnotation::Bool(true)) = back.annotations.get("wheelspin") {
-                wheelspin_image = egui::include_image!("../../assets/wheelspin-red.png");
-            }
-
-            // trailbrake steering analyzer
-            if back.brake > 0.05 {
-                trailbrake_steering_image = egui::include_image!("../../assets/steering-green.png");
-            }
-            if let Some(TelemetryAnnotation::Bool(true)) = back
-                .annotations
-                .get(TRAILBRAKE_EXCESSIVE_STEERING_ANNOTATION)
-            {
-                trailbrake_steering_image = egui::include_image!("../../assets/steering-red.png");
-            }
-
-            // slip/scrub alert
-            if let Some(TelemetryAnnotation::Bool(true)) =
-                back.annotations.get(SCRUBBING_ANNOTATION)
-            {
-                turn_image = egui::include_image!("../../assets/turn-scrub-red.png")
-            }
-            if let Some(TelemetryAnnotation::Bool(true)) = back.annotations.get(SLIP_ANNOTATION) {
-                turn_image = egui::include_image!("../../assets/turn-slip-red.png");
-            }
+            // check previously active alerts that should remain active
         }
         let button_align = match self.app_config.alerts_layout {
             AlertsLayout::Vertical => Align::Center,
@@ -151,9 +166,6 @@ impl LiveTelemetryApp {
             ui.add(Image::new(trailbrake_steering_image));
         });
         ui.separator();
-        ui.with_layout(Layout::top_down(button_align), |ui| {
-            ui.label("Slip");
-            ui.add(Image::new(turn_image));
-        });
+        self.scrub_slip_alert.show(ui, button_align);
     }
 }

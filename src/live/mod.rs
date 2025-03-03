@@ -5,10 +5,16 @@ mod telemetry_view;
 use std::{collections::VecDeque, sync::mpsc::Receiver, time::SystemTime};
 
 use config::AppConfig;
-use egui::{style::Widgets, Color32, CornerRadius, ViewportBuilder, ViewportId, Visuals};
+use egui::{
+    style::Widgets, Align, Color32, CornerRadius, Image, Layout, Ui, ViewportBuilder, ViewportId,
+    Visuals,
+};
 use log::error;
 
-use crate::telemetry::{TelemetryOutput, TelemetryPoint};
+use crate::{
+    telemetry::{TelemetryAnnotation, TelemetryOutput, TelemetryPoint},
+    OcypodeError,
+};
 
 const REFRESH_RATE_MS: usize = 100;
 pub(crate) const HISTORY_SECONDS: usize = 5;
@@ -23,6 +29,71 @@ const PALETTE_ORANGE: Color32 = Color32::from_rgb(242, 97, 63);
 const DEFAULT_BUTTON_CORNER_RADIUS: u8 = 4;
 const DEFAULT_WINDOW_CORNER_RADIUS: u8 = 10;
 const DEFAULT_WINDOW_TRANSPARENCY: u8 = 191;
+
+const ALERT_DURATION_MS: u128 = 500;
+
+struct ScrubSlipAlert {
+    alert_start_time: SystemTime,
+    is_slip: bool,
+    is_scrub: bool,
+}
+
+impl Default for ScrubSlipAlert {
+    fn default() -> Self {
+        Self {
+            alert_start_time: SystemTime::now(),
+            is_slip: false,
+            is_scrub: false,
+        }
+    }
+}
+
+impl ScrubSlipAlert {
+    fn update_state(&mut self, annotation: TelemetryAnnotation) -> Result<(), OcypodeError> {
+        match annotation {
+            TelemetryAnnotation::Slip {
+                prev_speed: _,
+                cur_speed: _,
+                is_slip,
+            } => {
+                self.is_slip = is_slip;
+                self.alert_start_time = SystemTime::now();
+            }
+            TelemetryAnnotation::Scrub {
+                avg_yaw_rate_change: _,
+                cur_yaw_rate_change: _,
+                is_scrubbing,
+            } => {
+                self.is_scrub = is_scrubbing;
+                self.alert_start_time = SystemTime::now();
+            }
+            _ => return Err(OcypodeError::InvalidTelemetryAnnotation),
+        };
+        Ok(())
+    }
+
+    fn show(&mut self, ui: &mut Ui, button_align: Align) {
+        let mut turn_image = egui::include_image!("../../assets/turn-grey.png");
+
+        if SystemTime::now()
+            .duration_since(self.alert_start_time)
+            .unwrap()
+            .as_millis()
+            < ALERT_DURATION_MS
+        {
+            if self.is_slip {
+                turn_image = egui::include_image!("../../assets/turn-slip-red.png");
+            }
+            if self.is_scrub {
+                turn_image = egui::include_image!("../../assets/turn-scrub-red.png");
+            }
+        }
+        ui.with_layout(Layout::top_down(button_align), |ui| {
+            ui.label("Slip");
+            ui.add(Image::new(turn_image));
+        });
+    }
+}
 
 /// `LiveTelemetryApp` is an application that displays live telemetry data in a graphical interface.
 ///
@@ -42,6 +113,7 @@ pub struct LiveTelemetryApp {
     window_size_points: usize,
     telemetry_points: VecDeque<TelemetryPoint>,
     app_config: AppConfig,
+    scrub_slip_alert: ScrubSlipAlert,
 }
 
 impl LiveTelemetryApp {
@@ -76,6 +148,7 @@ impl LiveTelemetryApp {
             window_size_points,
             telemetry_points: VecDeque::new(),
             app_config,
+            scrub_slip_alert: ScrubSlipAlert::default(),
         }
     }
 }

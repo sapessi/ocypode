@@ -1,9 +1,8 @@
-use std::{collections::HashMap, default};
+use std::default;
 
 use super::{TelemetryAnalyzer, TelemetryAnnotation};
 
 const DEFAULT_SHORT_SHIFT_SENSITIVITY: f32 = 100.;
-pub(crate) const SHORT_SHIFT_ANNOTATION: &str = "short_shift";
 
 pub(crate) struct ShortShiftingAnalyzer {
     prev_rpm: f32,
@@ -26,17 +25,18 @@ impl TelemetryAnalyzer for ShortShiftingAnalyzer {
         &mut self,
         telemetry_point: &super::TelemetryPoint,
         _session_info: &super::SessionInfo,
-    ) -> std::collections::HashMap<String, super::TelemetryAnnotation> {
-        let mut output = HashMap::new();
+    ) -> Vec<super::TelemetryAnnotation> {
+        let mut output = Vec::new();
         if self.prev_rpm > 0.
             && self.prev_gear > 0
             && telemetry_point.cur_gear > self.prev_gear
             && self.prev_rpm < telemetry_point.car_shift_ideal_rpm - self.sensitivity
         {
-            output.insert(
-                SHORT_SHIFT_ANNOTATION.to_string(),
-                TelemetryAnnotation::Bool(true),
-            );
+            output.push(TelemetryAnnotation::ShortShifting {
+                gear_change_rpm: self.prev_rpm,
+                optimal_rpm: telemetry_point.car_shift_ideal_rpm,
+                is_short_shifting: true,
+            });
         }
 
         // skip double-clutching from short-shifting
@@ -65,15 +65,19 @@ mod tests {
         let session_info = SessionInfo::default();
 
         let mut output = analyzer.analyze(&telemetry_point, &session_info);
-        assert!(!output.contains_key(SHORT_SHIFT_ANNOTATION));
+        assert!(output.is_empty());
         telemetry_point.cur_gear = 3;
         telemetry_point.cur_rpm = 5100.;
         output = analyzer.analyze(&telemetry_point, &session_info);
-        assert!(output.contains_key(SHORT_SHIFT_ANNOTATION));
-        assert_eq!(
-            output[SHORT_SHIFT_ANNOTATION],
-            TelemetryAnnotation::Bool(true)
-        );
+        assert_eq!(output.len(), 1);
+        assert!(match output.get(0).unwrap() {
+            TelemetryAnnotation::ShortShifting {
+                gear_change_rpm: _,
+                optimal_rpm: _,
+                is_short_shifting,
+            } => *is_short_shifting,
+            _ => false,
+        });
     }
 
     #[test]
@@ -91,6 +95,6 @@ mod tests {
         telemetry_point.cur_gear = 3;
         telemetry_point.cur_rpm = 5110.;
         let output = analyzer.analyze(&telemetry_point, &session_info);
-        assert!(!output.contains_key(SHORT_SHIFT_ANNOTATION));
+        assert!(output.is_empty());
     }
 }

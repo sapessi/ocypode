@@ -8,6 +8,7 @@ pub(crate) mod wheelspin_analyzer;
 
 use std::{
     collections::HashMap,
+    fmt::Display,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -16,11 +17,63 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum TelemetryAnnotation {
-    String(String),
-    Float(f32),
-    Int(i32),
-    Bool(bool),
-    NumberMap(HashMap<u32, f32>),
+    Slip {
+        prev_speed: f32,
+        cur_speed: f32,
+        is_slip: bool,
+    },
+    Scrub {
+        avg_yaw_rate_change: f32,
+        cur_yaw_rate_change: f32,
+        is_scrubbing: bool,
+    },
+    ShortShifting {
+        gear_change_rpm: f32,
+        optimal_rpm: f32,
+        is_short_shifting: bool,
+    },
+    TrailbrakeSteering {
+        cur_trailbrake_steering: f32,
+        is_excessive_trailbrake_steering: bool,
+    },
+    Wheelspin {
+        avg_rpm_increase_per_gear: HashMap<u32, f32>,
+        cur_gear: u32,
+        cur_rpm_increase: f32,
+        is_wheelspin: bool,
+    },
+}
+
+impl Display for TelemetryAnnotation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TelemetryAnnotation::Slip {
+                prev_speed: _,
+                cur_speed: _,
+                is_slip: _,
+            } => write!(f, "slip"),
+            TelemetryAnnotation::Scrub {
+                avg_yaw_rate_change: _,
+                cur_yaw_rate_change: _,
+                is_scrubbing: _,
+            } => write!(f, "scrub"),
+            TelemetryAnnotation::ShortShifting {
+                gear_change_rpm: _,
+                optimal_rpm: _,
+                is_short_shifting: _,
+            } => write!(f, "short_shift"),
+            TelemetryAnnotation::TrailbrakeSteering {
+                cur_trailbrake_steering: _,
+                is_excessive_trailbrake_steering: _,
+            } => write!(f, "trailbrake"),
+            TelemetryAnnotation::Wheelspin {
+                avg_rpm_increase_per_gear: _,
+                cur_gear: _,
+                cur_rpm_increase: _,
+                is_wheelspin: _,
+            } => write!(f, "wheelspin"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -97,7 +150,7 @@ pub struct TelemetryPoint {
     pub lr_tire_info: Option<TireInfo>,
     pub rr_tire_info: Option<TireInfo>,
 
-    pub annotations: HashMap<String, TelemetryAnnotation>,
+    pub annotations: Vec<TelemetryAnnotation>,
 }
 
 impl Default for TelemetryPoint {
@@ -136,7 +189,7 @@ impl Default for TelemetryPoint {
             rf_tire_info: None,
             lr_tire_info: None,
             rr_tire_info: None,
-            annotations: HashMap::new(),
+            annotations: Vec::new(),
         }
     }
 }
@@ -175,5 +228,5 @@ pub trait TelemetryAnalyzer {
         &mut self,
         telemetry_point: &TelemetryPoint,
         session_info: &SessionInfo,
-    ) -> HashMap<String, TelemetryAnnotation>;
+    ) -> Vec<TelemetryAnnotation>;
 }

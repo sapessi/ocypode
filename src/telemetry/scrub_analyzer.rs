@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use simple_moving_average::{SumTreeSMA, SMA};
 
 use super::{TelemetryAnalyzer, TelemetryAnnotation};
@@ -8,10 +6,6 @@ use super::{TelemetryAnalyzer, TelemetryAnnotation};
 const MIN_STEERING_PCT_MEASURE: f32 = 0.1;
 const MIN_BRAKE_PCT_MEASURE: f32 = 0.4;
 const MAX_THROTTLE_PCT_MEASURE: f32 = 0.4;
-
-pub(crate) const SCRUBBING_YAW_RATE_ANNOTATION: &str = "scrubbing_average_yaw_change";
-pub(crate) const YAW_RATE_CHANGE_ANNOTATION: &str = "yaw_change";
-pub(crate) const SCRUBBING_ANNOTATION: &str = "is_scrubbing";
 
 pub(crate) struct ScrubAnalyzer<const WINDOW_SIZE: usize> {
     steering_to_yaw_average: SumTreeSMA<f32, f32, WINDOW_SIZE>,
@@ -32,8 +26,8 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for ScrubAnalyzer<WINDOW_SIZE> 
         &mut self,
         telemetry_point: &super::TelemetryPoint,
         _session_info: &super::SessionInfo,
-    ) -> std::collections::HashMap<String, super::TelemetryAnnotation> {
-        let mut output = HashMap::new();
+    ) -> Vec<super::TelemetryAnnotation> {
+        let mut output = Vec::new();
         let yaw_rate_change = telemetry_point.steering_pct.abs() - telemetry_point.yaw_rate.abs();
         if telemetry_point.steering_pct > MIN_STEERING_PCT_MEASURE
             && (telemetry_point.brake >= MIN_BRAKE_PCT_MEASURE
@@ -46,18 +40,11 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for ScrubAnalyzer<WINDOW_SIZE> 
             if self.steering_to_yaw_average.get_num_samples() >= self.min_points {
                 let avg_steering_to_yaw_change = self.steering_to_yaw_average.get_average();
                 if yaw_rate_change > avg_steering_to_yaw_change {
-                    output.insert(
-                        SCRUBBING_YAW_RATE_ANNOTATION.to_string(),
-                        TelemetryAnnotation::Float(avg_steering_to_yaw_change),
-                    );
-                    output.insert(
-                        YAW_RATE_CHANGE_ANNOTATION.to_string(),
-                        TelemetryAnnotation::Float(yaw_rate_change),
-                    );
-                    output.insert(
-                        SCRUBBING_ANNOTATION.to_string(),
-                        TelemetryAnnotation::Bool(true),
-                    );
+                    output.push(TelemetryAnnotation::Scrub {
+                        avg_yaw_rate_change: avg_steering_to_yaw_change,
+                        cur_yaw_rate_change: yaw_rate_change,
+                        is_scrubbing: true,
+                    });
                 }
             }
         }
@@ -96,13 +83,16 @@ mod tests {
             ..Default::default()
         };
         let output = analyzer.analyze(&scrub_telemetry_point, &session_info);
-        assert!(output.contains_key(SCRUBBING_YAW_RATE_ANNOTATION));
-        assert!(output.contains_key(YAW_RATE_CHANGE_ANNOTATION));
-        assert!(output.contains_key(SCRUBBING_ANNOTATION));
-        assert_eq!(
-            output[SCRUBBING_ANNOTATION],
-            TelemetryAnnotation::Bool(true)
-        );
+        assert_eq!(output.len(), 1);
+        let scrub_annotation = match output.get(0).unwrap() {
+            TelemetryAnnotation::Scrub {
+                avg_yaw_rate_change: _,
+                cur_yaw_rate_change: _,
+                is_scrubbing,
+            } => *is_scrubbing,
+            _ => false,
+        };
+        assert!(scrub_annotation);
     }
 
     #[test]
@@ -123,9 +113,7 @@ mod tests {
         }
 
         let output = analyzer.analyze(&telemetry_point, &session_info);
-        assert!(!output.contains_key(SCRUBBING_YAW_RATE_ANNOTATION));
-        assert!(!output.contains_key(YAW_RATE_CHANGE_ANNOTATION));
-        assert!(!output.contains_key(SCRUBBING_ANNOTATION));
+        assert!(output.is_empty());
     }
 
     #[test]
@@ -146,9 +134,7 @@ mod tests {
         }
 
         let output = analyzer.analyze(&telemetry_point, &session_info);
-        assert!(!output.contains_key(SCRUBBING_YAW_RATE_ANNOTATION));
-        assert!(!output.contains_key(YAW_RATE_CHANGE_ANNOTATION));
-        assert!(!output.contains_key(SCRUBBING_ANNOTATION));
+        assert!(output.is_empty());
     }
 
     #[test]
@@ -169,8 +155,6 @@ mod tests {
         }
 
         let output = analyzer.analyze(&telemetry_point, &session_info);
-        assert!(!output.contains_key(SCRUBBING_YAW_RATE_ANNOTATION));
-        assert!(!output.contains_key(YAW_RATE_CHANGE_ANNOTATION));
-        assert!(!output.contains_key(SCRUBBING_ANNOTATION));
+        assert!(output.is_empty());
     }
 }

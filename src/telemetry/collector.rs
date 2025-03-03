@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     sync::mpsc::Sender,
     thread,
     time::{Duration, SystemTime},
@@ -82,9 +81,10 @@ pub fn collect_telemetry(
         }
 
         let mut measurement = producer.telemetry()?;
-        let mut annotations: HashMap<String, TelemetryAnnotation> = HashMap::new();
+        let mut annotations: Vec<TelemetryAnnotation> = Vec::new();
         for analyzer in analyzers.iter_mut() {
-            annotations.extend(analyzer.analyze(&measurement, &last_session_info));
+            //annotations.extend(analyzer.analyze(&measurement, &last_session_info));
+            annotations.append(&mut analyzer.analyze(&measurement, &last_session_info));
         }
         if !annotations.is_empty() {
             measurement.annotations = annotations;
