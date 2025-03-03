@@ -84,7 +84,7 @@ mod tests {
         };
         let output = analyzer.analyze(&scrub_telemetry_point, &session_info);
         assert_eq!(output.len(), 1);
-        let scrub_annotation = match output.get(0).unwrap() {
+        let scrub_annotation = match output.first().unwrap() {
             TelemetryAnnotation::Scrub {
                 avg_yaw_rate_change: _,
                 cur_yaw_rate_change: _,

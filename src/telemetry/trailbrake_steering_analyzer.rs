@@ -80,7 +80,7 @@ mod tests {
         let annotations = analyzer.analyze(&point, &session_info);
         assert_eq!(annotations.len(), 1);
         assert_eq!(
-            *annotations.get(0).unwrap(),
+            *annotations.first().unwrap(),
             TelemetryAnnotation::TrailbrakeSteering {
                 cur_trailbrake_steering: 0.3,
                 is_excessive_trailbrake_steering: true

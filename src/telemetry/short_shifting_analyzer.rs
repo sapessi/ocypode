@@ -70,7 +70,7 @@ mod tests {
         telemetry_point.cur_rpm = 5100.;
         output = analyzer.analyze(&telemetry_point, &session_info);
         assert_eq!(output.len(), 1);
-        assert!(match output.get(0).unwrap() {
+        assert!(match output.first().unwrap() {
             TelemetryAnnotation::ShortShifting {
                 gear_change_rpm: _,
                 optimal_rpm: _,

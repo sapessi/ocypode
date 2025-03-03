@@ -62,7 +62,7 @@ mod tests {
 
         let output = analyzer.analyze(&telemetry_point, &session_info);
         assert_eq!(output.len(), 1);
-        assert!(match output.get(0).unwrap() {
+        assert!(match output.first().unwrap() {
             TelemetryAnnotation::Slip {
                 prev_speed: _,
                 cur_speed: _,
