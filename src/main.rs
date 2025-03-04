@@ -1,3 +1,4 @@
+mod analysis;
 mod live;
 mod telemetry;
 mod writer;
@@ -9,6 +10,7 @@ use std::{
     thread,
 };
 
+use analysis::TelemetryAnalysisApp;
 use clap::{arg, Parser, Subcommand};
 use egui::Vec2;
 use live::{config::AppConfig, LiveTelemetryApp, HISTORY_SECONDS};
@@ -48,6 +50,10 @@ enum OcypodeError {
     // UI errors
     #[snafu(display("Invalid telemetry annotation"))]
     InvalidTelemetryAnnotation,
+    #[snafu(display("Invalid telemetry file: {path}"))]
+    InvalidTelemetryFile { path: String },
+    #[snafu(display("Error loading telemetry file"))]
+    TelemetryLoaderError { source: io::Error },
 }
 
 impl From<SendError<TelemetryOutput>> for OcypodeError {
@@ -77,7 +83,7 @@ enum Commands {
     },
     Load {
         #[arg(short, long)]
-        input: Option<PathBuf>,
+        input: PathBuf,
     },
 }
 
@@ -137,6 +143,21 @@ fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError>
     Ok(())
 }
 
+fn load(input: &PathBuf) -> Result<(), OcypodeError> {
+    if !input.exists() {
+        return Err(OcypodeError::InvalidTelemetryFile {
+            path: format!("{:?}", input),
+        });
+    }
+    eframe::run_native(
+        "Ocypode Telemetry",
+        eframe::NativeOptions::default(),
+        Box::new(|cc| Ok(Box::new(TelemetryAnalysisApp::from_file(input, cc)))),
+    )
+    .expect("could not start app");
+    Ok(())
+}
+
 fn main() {
     #[cfg(debug_assertions)]
     colog::init();
@@ -148,8 +169,8 @@ fn main() {
     })
     .expect("Could not set Ctrl-C handler");
     match &cli.command {
-        Commands::Load { input: _ } => {
-            todo!()
+        Commands::Load { input } => {
+            load(input).expect("Error while analyzing telemetry file");
         }
         Commands::Live { window, output } => {
             live(*window, output.clone()).expect("Error while running live telemetry")

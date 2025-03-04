@@ -1040,6 +1040,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui-dropdown"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82d277c6c1f49e4e227344e920132d2d22a51810296b5c78f90e6aef4eed63ea"
+dependencies = [
+ "egui",
+]
+
+[[package]]
 name = "egui-wgpu"
 version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2482,12 +2491,14 @@ dependencies = [
  "dirs",
  "eframe",
  "egui",
+ "egui-dropdown",
  "egui_extras",
  "egui_plot",
  "iracing",
  "itertools",
  "log",
  "serde",
+ "serde-jsonlines",
  "serde_json",
  "simple_moving_average",
  "snafu",
@@ -2986,6 +2997,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02fc4265df13d6fa1d00ecff087228cc0a2b5f3c0e87e258d8b94a156e984c70"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-jsonlines"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "013e069239d98648ea43a9c01845b381445e88de08b5a895ef9302e3bffde03d"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

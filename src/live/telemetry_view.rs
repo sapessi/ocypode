@@ -128,7 +128,7 @@ impl LiveTelemetryApp {
     }
 }
 
-fn stroke_shade(start: Color32, end: Color32, y: f32) -> Color32 {
+pub(crate) fn stroke_shade(start: Color32, end: Color32, y: f32) -> Color32 {
     Color32::from_rgb(
         u8::try_from(
             (start.r() as f32 + y * (end.r() as f32 - start.r() as f32)).clamp(0., 255.) as u32,

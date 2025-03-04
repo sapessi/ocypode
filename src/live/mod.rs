@@ -1,6 +1,6 @@
 mod alerts_view;
 pub(crate) mod config;
-mod telemetry_view;
+pub(crate) mod telemetry_view;
 
 use std::{collections::VecDeque, sync::mpsc::Receiver, time::SystemTime};
 
@@ -21,10 +21,10 @@ pub(crate) const HISTORY_SECONDS: usize = 5;
 const MAX_POINTS_PER_REFRESH: usize = 10;
 const MAX_TIME_PER_REFRESH_MS: u128 = 50;
 
-const PALETTE_BLACK: Color32 = Color32::from_rgb(12, 12, 12);
-const PALETTE_BROWN: Color32 = Color32::from_rgb(72, 30, 20);
-const PALETTE_MAROON: Color32 = Color32::from_rgb(155, 57, 34);
-const PALETTE_ORANGE: Color32 = Color32::from_rgb(242, 97, 63);
+pub(crate) const PALETTE_BLACK: Color32 = Color32::from_rgb(12, 12, 12);
+pub(crate) const PALETTE_BROWN: Color32 = Color32::from_rgb(72, 30, 20);
+pub(crate) const PALETTE_MAROON: Color32 = Color32::from_rgb(155, 57, 34);
+pub(crate) const PALETTE_ORANGE: Color32 = Color32::from_rgb(242, 97, 63);
 
 const DEFAULT_BUTTON_CORNER_RADIUS: u8 = 4;
 const DEFAULT_WINDOW_CORNER_RADIUS: u8 = 10;
