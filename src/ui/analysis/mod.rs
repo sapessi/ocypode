@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use egui::{
-    style::Widgets, Color32, Direction, Frame, Layout, Margin, RichText, TextEdit, Ui, Vec2b,
+    style::Widgets, Align, Color32, Direction, Frame, Label, Layout, Margin, RichText, Ui, Vec2b,
     Visuals,
 };
 use egui_dropdown::DropDownBox;
@@ -9,12 +9,12 @@ use egui_plot::{Legend, Line, PlotPoints, Points};
 use itertools::Itertools;
 
 use crate::{
-    telemetry::{SessionInfo, TelemetryOutput, TelemetryPoint},
+    telemetry::{SessionInfo, TelemetryAnnotation, TelemetryOutput, TelemetryPoint},
     ui::live::{PALETTE_BLACK, PALETTE_BROWN, PALETTE_MAROON, PALETTE_ORANGE},
     OcypodeError,
 };
 
-use super::stroke_shade;
+use super::{stroke_shade, Alert, DefaultAlert, ScrubSlipAlert};
 
 #[derive(Default, Clone, Debug)]
 struct TelemetryFile {
@@ -45,6 +45,7 @@ pub(crate) struct TelemetryAnalysisApp<'file> {
     data: Option<TelemetryFile>,
     selected_session: String,
     selected_lap: String,
+    selected_annotation_content: String,
     selected_x: Option<usize>,
 }
 
@@ -69,6 +70,7 @@ impl<'file> TelemetryAnalysisApp<'file> {
             data: None,
             selected_session: "".to_string(),
             selected_lap: "".to_string(),
+            selected_annotation_content: "".to_string(),
             selected_x: None,
         }
     }
@@ -188,6 +190,7 @@ impl<'file> TelemetryAnalysisApp<'file> {
                     });
                 if plot_response.response.clicked() {
                     if let Some(mouse_pos) = plot_response.response.interact_pointer_pos() {
+                        self.selected_annotation_content = "".to_string();
                         self.selected_x = Some(
                             plot_response
                                 .transform
@@ -204,8 +207,9 @@ impl<'file> TelemetryAnalysisApp<'file> {
 
 impl eframe::App for TelemetryAnalysisApp<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let cur_ui_stae = self.ui_state.clone();
-        match cur_ui_stae {
+        egui_extras::install_image_loaders(ctx);
+        let cur_ui_state = self.ui_state.clone();
+        match cur_ui_state {
             UiState::Loading => {
                 if self.data.is_none() {
                     let telemetry_load_result = load_telemetry_jsonl(self.source_file);
@@ -247,21 +251,94 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                             .fill(Color32::TRANSPARENT)
                             .inner_margin(Margin::same(5)),
                     )
-                    .resizable(true)
-                    .max_width(ctx.available_rect().width() * 0.3)
+                    .resizable(false)
+                    .min_width(ctx.available_rect().width() * 0.3)
+                    .max_width(ctx.available_rect().height() / 7.)
                     .show(ctx, |local_ui| {
                         if let Ok(selected_lap) = self.selected_lap.parse::<usize>() {
                             if let Some(x_point) = self.selected_x {
                                 if let Some(lap) = session.laps.get(selected_lap) {
                                     if let Some(telemetry) = lap.telemetry.get(x_point) {
-                                        let mut str_buffer =
-                                            serde_json::to_string_pretty(&telemetry.annotations)
-                                                .unwrap();
+                                        let mut abs_alert = DefaultAlert::abs().button();
+                                        let mut shift_alert = DefaultAlert::shift().button();
+                                        let mut traction_alert = DefaultAlert::traction().button();
+                                        let mut trailbrake_steering_alert = DefaultAlert::trailbrake_steering().button();
+                                        let mut slip_alert = ScrubSlipAlert::default().button();
+
+                                        let _ = abs_alert.update_state(telemetry);
+                                        let _ = shift_alert.update_state(telemetry);
+                                        let _ = traction_alert.update_state(telemetry);
+                                        let _ = trailbrake_steering_alert.update_state(telemetry);
+                                        let _ = slip_alert.update_state(telemetry);
+
+                                        local_ui.with_layout(Layout::top_down(Align::Center), |ui| {
+                                            if abs_alert.show(ui, Align::Center).clicked() {
+                                                self.selected_annotation_content = format!("brake force: {:.2}", telemetry.brake);
+                                            };
+                                            ui.separator();
+                                            if shift_alert.show(ui, Align::Center).clicked() {
+                                                if let Some(TelemetryAnnotation::ShortShifting { gear_change_rpm, optimal_rpm, is_short_shifting: _ }) =
+                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::ShortShifting { gear_change_rpm: _, optimal_rpm: _, is_short_shifting: _ })) {
+                                                        self.selected_annotation_content = format!(
+                                                            "From gear: {}\nTo gear: {}\nIdeal RPM: {}\nActual RPM: {}",
+                                                            telemetry.cur_gear - 1,
+                                                            telemetry.cur_gear,
+                                                            optimal_rpm,
+                                                            gear_change_rpm
+                                                        )
+                                                }
+                                            }
+                                            ui.separator();
+                                            if traction_alert.show(ui, Align::Center).clicked() {
+                                                if let Some(TelemetryAnnotation::Wheelspin { avg_rpm_increase_per_gear, cur_gear, cur_rpm_increase, is_wheelspin: _ }) =
+                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::Wheelspin { avg_rpm_increase_per_gear: _, cur_gear: _, cur_rpm_increase: _, is_wheelspin: _ })) {
+                                                        self.selected_annotation_content = format!(
+                                                            "Gear: {}\nRPM increase: {:.1}\np90 RPM increase: {:.1}\nRPM increase per gear:\n{}",
+                                                            cur_gear,
+                                                            cur_rpm_increase,
+                                                            avg_rpm_increase_per_gear.get(cur_gear).unwrap(),
+                                                            serde_json::to_string_pretty(avg_rpm_increase_per_gear).unwrap()
+                                                        );
+                                                }
+                                            }
+                                            ui.separator();
+                                            if trailbrake_steering_alert.show(ui, Align::Center).clicked() {
+                                                if let Some(TelemetryAnnotation::TrailbrakeSteering { cur_trailbrake_steering, is_excessive_trailbrake_steering: _ }) =
+                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::TrailbrakeSteering { cur_trailbrake_steering: _, is_excessive_trailbrake_steering: _ })) {
+                                                        self.selected_annotation_content = format!(
+                                                            "Steering: {:.2}%\nSteering angle (rad): {}",
+                                                            cur_trailbrake_steering,
+                                                            telemetry.steering
+                                                        );
+                                                }
+                                            }
+                                            ui.separator();
+                                            if slip_alert.show(ui, Align::Center).clicked() {
+                                                if let Some(TelemetryAnnotation::Scrub { avg_yaw_rate_change, cur_yaw_rate_change, is_scrubbing: _ }) =
+                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::Scrub { avg_yaw_rate_change: _, cur_yaw_rate_change: _, is_scrubbing: _ })) {
+                                                        self.selected_annotation_content = format!(
+                                                            "Yaw change: {:.2}\nAvg yaw change: {:.2}\nSteering (rad): {:.2}\nSpeed: {:.2}",
+                                                            cur_yaw_rate_change,
+                                                            avg_yaw_rate_change,
+                                                            telemetry.steering,
+                                                            telemetry.cur_speed
+                                                        );
+                                                }
+                                                if let Some(TelemetryAnnotation::Slip { prev_speed, cur_speed, is_slip: _ }) =
+                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::Slip { prev_speed: _, cur_speed: _, is_slip: _ })) {
+                                                        self.selected_annotation_content = format!(
+                                                            "Speed: {:.2}\nPrev speed: {:.2}\nThrottle %: {:.2}%\nSteering (rad): {:.2}%",
+                                                            cur_speed,
+                                                            prev_speed,
+                                                            telemetry.throttle,
+                                                            telemetry.steering
+                                                        );
+                                                }
+                                            }
+                                        });
+
                                         local_ui.add(
-                                            TextEdit::multiline(&mut str_buffer)
-                                                .interactive(false)
-                                                .desired_width(ctx.available_rect().width() * 0.3)
-                                                .code_editor(),
+                                            Label::new(RichText::new(self.selected_annotation_content.clone()).color(Color32::WHITE))
                                         );
                                     }
                                 }

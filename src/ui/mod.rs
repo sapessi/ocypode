@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use egui::{Align, Color32, Image, Layout, RichText, Ui};
+use egui::{Align, Color32, Image, ImageButton, Layout, Response, RichText, Ui};
 use log::debug;
 
 use crate::{
@@ -16,13 +16,14 @@ pub(crate) type AlertImageSelector<'a> = fn(&TelemetryPoint) -> Image<'a>;
 
 pub(crate) trait Alert {
     fn update_state(&mut self, telemetry_point: &TelemetryPoint) -> Result<(), OcypodeError>;
-    fn show(&mut self, ui: &mut Ui, align: Align);
+    fn show(&mut self, ui: &mut Ui, align: Align) -> Response;
 }
 
 pub(crate) struct DefaultAlert<'i> {
     image_selector: AlertImageSelector<'i>,
     current_image: Image<'i>,
     text: String,
+    is_button: bool,
 }
 
 impl<'i> DefaultAlert<'i> {
@@ -31,6 +32,7 @@ impl<'i> DefaultAlert<'i> {
             image_selector,
             text,
             current_image: image_selector(&TelemetryPoint::default()),
+            is_button: false,
         }
     }
 
@@ -123,6 +125,11 @@ impl<'i> DefaultAlert<'i> {
             trailbrake_image.into()
         })
     }
+
+    pub(crate) fn button(mut self) -> Self {
+        self.is_button = true;
+        self
+    }
 }
 
 impl Alert for DefaultAlert<'_> {
@@ -131,11 +138,16 @@ impl Alert for DefaultAlert<'_> {
         Ok(())
     }
 
-    fn show(&mut self, ui: &mut Ui, align: Align) {
+    fn show(&mut self, ui: &mut Ui, align: Align) -> Response {
         ui.with_layout(Layout::top_down(align), |ui| {
             ui.label(RichText::new(self.text.clone()).color(Color32::WHITE));
-            ui.add(self.current_image.clone());
-        });
+            if self.is_button {
+                ui.add(ImageButton::new(self.current_image.clone()).frame(false))
+            } else {
+                ui.add(self.current_image.clone())
+            }
+        })
+        .inner
     }
 }
 
@@ -143,6 +155,7 @@ pub(crate) struct ScrubSlipAlert {
     alert_start_time: SystemTime,
     is_slip: bool,
     is_scrub: bool,
+    is_button: bool,
 }
 
 impl Default for ScrubSlipAlert {
@@ -151,7 +164,15 @@ impl Default for ScrubSlipAlert {
             alert_start_time: SystemTime::now(),
             is_slip: false,
             is_scrub: false,
+            is_button: false,
         }
+    }
+}
+
+impl ScrubSlipAlert {
+    pub(crate) fn button(mut self) -> Self {
+        self.is_button = true;
+        self
     }
 }
 
@@ -183,7 +204,7 @@ impl Alert for ScrubSlipAlert {
         Ok(())
     }
 
-    fn show(&mut self, ui: &mut Ui, button_align: Align) {
+    fn show(&mut self, ui: &mut Ui, button_align: Align) -> Response {
         let mut turn_image = egui::include_image!("../../assets/turn-grey.png");
         let mut text = "slip";
         if SystemTime::now()
@@ -204,8 +225,13 @@ impl Alert for ScrubSlipAlert {
 
         ui.with_layout(Layout::top_down(button_align), |ui| {
             ui.label(RichText::new(text).color(Color32::WHITE));
-            ui.add(Image::new(turn_image));
-        });
+            if self.is_button {
+                ui.add(ImageButton::new(turn_image).frame(false))
+            } else {
+                ui.add(Image::new(turn_image))
+            }
+        })
+        .inner
     }
 }
 
