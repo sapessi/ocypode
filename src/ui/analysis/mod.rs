@@ -1,8 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use egui::{
-    style::Widgets, Align, Color32, Direction, Frame, Label, Layout, Margin, RichText, Ui, Vec2b,
-    Visuals,
+    style::Widgets, Align, Color32, Direction, Frame, Label, Layout, Margin, RichText, Ui, Vec2b, Visuals
 };
 use egui_dropdown::DropDownBox;
 use egui_plot::{Legend, Line, PlotPoints, Points};
@@ -45,6 +44,7 @@ pub(crate) struct TelemetryAnalysisApp<'file> {
     data: Option<TelemetryFile>,
     selected_session: String,
     selected_lap: String,
+    comparison_lap: String,
     selected_annotation_content: String,
     selected_x: Option<usize>,
 }
@@ -70,6 +70,7 @@ impl<'file> TelemetryAnalysisApp<'file> {
             data: None,
             selected_session: "".to_string(),
             selected_lap: "".to_string(),
+            comparison_lap: "".to_string(),
             selected_annotation_content: "".to_string(),
             selected_x: None,
         }
@@ -94,8 +95,7 @@ impl<'file> TelemetryAnalysisApp<'file> {
                 )
                 .filter_by_input(false),
             );
-            ui.separator();
-            ui.label(RichText::new("Lap: ").color(Color32::WHITE));
+
             if let Some(selected_session) = self
                 .data
                 .as_ref()
@@ -104,6 +104,8 @@ impl<'file> TelemetryAnalysisApp<'file> {
                 .iter()
                 .find(|p| p.info.track_name == self.selected_session)
             {
+                ui.separator();
+                ui.label(RichText::new("Lap: ").color(Color32::WHITE));
                 let laps_iter = (0..selected_session.laps.len())
                     .map(|l| l.to_string())
                     .collect_vec();
@@ -112,6 +114,30 @@ impl<'file> TelemetryAnalysisApp<'file> {
                         laps_iter,
                         "lap_dropbox",
                         &mut self.selected_lap,
+                        |ui, text| ui.selectable_label(false, text),
+                    )
+                    .filter_by_input(false),
+                );
+            }
+            
+            if let Some(selected_session) = self
+                .data
+                .as_ref()
+                .unwrap()
+                .sessions
+                .iter()
+                .find(|p| p.info.track_name == self.selected_session)
+            {
+                ui.separator();
+                ui.label(RichText::new("Comparison lap: ").color(Color32::WHITE));
+                let laps_iter = (0..selected_session.laps.len())
+                    .map(|l| l.to_string())
+                    .collect_vec();
+                ui.add(
+                    DropDownBox::from_iter(
+                        laps_iter,
+                        "comparison_lap_dropbox",
+                        &mut self.comparison_lap,
                         |ui, text| ui.selectable_label(false, text),
                     )
                     .filter_by_input(false),
@@ -187,6 +213,54 @@ impl<'file> TelemetryAnalysisApp<'file> {
                                 .radius(10.)
                                 .name("Annotation"),
                         );
+
+                        if !self.comparison_lap.is_empty() {
+                            if let Some(comparison_lap) = session
+                                .laps
+                                .get(self.comparison_lap.parse::<usize>().unwrap())
+                            {
+                                let comparison_throttle_points = PlotPoints::new(
+                                    comparison_lap
+                                        .telemetry
+                                        .iter()
+                                        .enumerate()
+                                        .map(|t| [t.0 as f64, t.1.throttle as f64 * 100.])
+                                        .collect(),
+                                );
+                                let comparison_brake_points = PlotPoints::new(
+                                    comparison_lap
+                                        .telemetry
+                                        .iter()
+                                        .enumerate()
+                                        .map(|t| [t.0 as f64, t.1.brake as f64 * 100.])
+                                        .collect(),
+                                );
+                                let comparison_steering_points = PlotPoints::new(
+                                    comparison_lap
+                                        .telemetry
+                                        .iter()
+                                        .enumerate()
+                                        .map(|t| [t.0 as f64, 50. + 50. * t.1.steering_pct as f64])
+                                        .collect(),
+                                );
+
+                                plot_ui.line(
+                                    Line::new(comparison_throttle_points)
+                                        .color(Color32::DARK_GREEN)
+                                        .name("Comparison Throttle"),
+                                );
+                                plot_ui.line(
+                                    Line::new(comparison_brake_points)
+                                        .color(Color32::DARK_RED)
+                                        .name("Comparison Brake"),
+                                );
+                                plot_ui.line(
+                                    Line::new(comparison_steering_points)
+                                        .color(Color32::DARK_GRAY.gamma_multiply(0.3))
+                                        .name("Comparison Steering"),
+                                );
+                            }
+                        }
                     });
                 if plot_response.response.clicked() {
                     if let Some(mouse_pos) = plot_response.response.interact_pointer_pos() {
