@@ -1,7 +1,8 @@
 use std::{path::PathBuf, sync::Arc};
 
 use egui::{
-    style::Widgets, Align, Color32, Direction, Frame, Label, Layout, Margin, RichText, Ui, Vec2b, Visuals
+    style::Widgets, Align, Color32, Direction, Frame, Label, Layout, Margin, RichText, Ui, Vec2b,
+    Visuals,
 };
 use egui_dropdown::DropDownBox;
 use egui_plot::{Legend, Line, PlotPoints, Points};
@@ -119,7 +120,7 @@ impl<'file> TelemetryAnalysisApp<'file> {
                     .filter_by_input(false),
                 );
             }
-            
+
             if let Some(selected_session) = self
                 .data
                 .as_ref()
