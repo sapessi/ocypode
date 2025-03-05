@@ -1,6 +1,5 @@
-mod analysis;
-mod live;
 mod telemetry;
+mod ui;
 mod writer;
 
 use std::{
@@ -10,12 +9,12 @@ use std::{
     thread,
 };
 
-use analysis::TelemetryAnalysisApp;
 use clap::{arg, Parser, Subcommand};
 use egui::Vec2;
-use live::{config::AppConfig, LiveTelemetryApp, HISTORY_SECONDS};
 use snafu::Snafu;
 use telemetry::{producer::IRacingTelemetryProducer, TelemetryOutput};
+use ui::analysis::TelemetryAnalysisApp;
+use ui::live::{config::AppConfig, LiveTelemetryApp, HISTORY_SECONDS};
 
 #[derive(Debug, Snafu)]
 enum OcypodeError {
@@ -48,8 +47,6 @@ enum OcypodeError {
     ConfigSerializeError { source: serde_json::Error },
 
     // UI errors
-    #[snafu(display("Invalid telemetry annotation"))]
-    InvalidTelemetryAnnotation,
     #[snafu(display("Invalid telemetry file: {path}"))]
     InvalidTelemetryFile { path: String },
     #[snafu(display("Error loading telemetry file"))]

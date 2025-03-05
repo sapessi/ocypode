@@ -9,12 +9,12 @@ use egui_plot::{Legend, Line, PlotPoints, Points};
 use itertools::Itertools;
 
 use crate::{
-    live::{
-        telemetry_view::stroke_shade, PALETTE_BLACK, PALETTE_BROWN, PALETTE_MAROON, PALETTE_ORANGE,
-    },
     telemetry::{SessionInfo, TelemetryOutput, TelemetryPoint},
+    ui::live::{PALETTE_BLACK, PALETTE_BROWN, PALETTE_MAROON, PALETTE_ORANGE},
     OcypodeError,
 };
+
+use super::stroke_shade;
 
 #[derive(Default, Clone, Debug)]
 struct TelemetryFile {
