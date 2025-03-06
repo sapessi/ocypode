@@ -352,8 +352,8 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                             };
                                             ui.separator();
                                             if shift_alert.show(ui, Align::Center).clicked() {
-                                                if let Some(TelemetryAnnotation::ShortShifting { gear_change_rpm, optimal_rpm, is_short_shifting: _ }) =
-                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::ShortShifting { gear_change_rpm: _, optimal_rpm: _, is_short_shifting: _ })) {
+                                                if let Some(TelemetryAnnotation::ShortShifting { gear_change_rpm, optimal_rpm, .. }) =
+                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::ShortShifting { .. })) {
                                                         self.selected_annotation_content = format!(
                                                             "From gear: {}\nTo gear: {}\nIdeal RPM: {}\nActual RPM: {}",
                                                             telemetry.cur_gear - 1,
@@ -365,8 +365,8 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                             }
                                             ui.separator();
                                             if traction_alert.show(ui, Align::Center).clicked() {
-                                                if let Some(TelemetryAnnotation::Wheelspin { avg_rpm_increase_per_gear, cur_gear, cur_rpm_increase, is_wheelspin: _ }) =
-                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::Wheelspin { avg_rpm_increase_per_gear: _, cur_gear: _, cur_rpm_increase: _, is_wheelspin: _ })) {
+                                                if let Some(TelemetryAnnotation::Wheelspin { avg_rpm_increase_per_gear, cur_gear, cur_rpm_increase, .. }) =
+                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::Wheelspin { .. })) {
                                                         self.selected_annotation_content = format!(
                                                             "Gear: {}\nRPM increase: {:.1}\np90 RPM increase: {:.1}\nRPM increase per gear:\n{}",
                                                             cur_gear,
@@ -378,8 +378,8 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                             }
                                             ui.separator();
                                             if trailbrake_steering_alert.show(ui, Align::Center).clicked() {
-                                                if let Some(TelemetryAnnotation::TrailbrakeSteering { cur_trailbrake_steering, is_excessive_trailbrake_steering: _ }) =
-                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::TrailbrakeSteering { cur_trailbrake_steering: _, is_excessive_trailbrake_steering: _ })) {
+                                                if let Some(TelemetryAnnotation::TrailbrakeSteering { cur_trailbrake_steering, .. }) =
+                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::TrailbrakeSteering { .. })) {
                                                         self.selected_annotation_content = format!(
                                                             "Steering: {:.2}%\nSteering angle (rad): {}",
                                                             cur_trailbrake_steering,
@@ -389,8 +389,8 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                             }
                                             ui.separator();
                                             if slip_alert.show(ui, Align::Center).clicked() {
-                                                if let Some(TelemetryAnnotation::Scrub { avg_yaw_rate_change, cur_yaw_rate_change, is_scrubbing: _ }) =
-                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::Scrub { avg_yaw_rate_change: _, cur_yaw_rate_change: _, is_scrubbing: _ })) {
+                                                if let Some(TelemetryAnnotation::Scrub { avg_yaw_rate_change, cur_yaw_rate_change, .. }) =
+                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::Scrub { .. })) {
                                                         self.selected_annotation_content = format!(
                                                             "Yaw change: {:.2}\nAvg yaw change: {:.2}\nSteering (rad): {:.2}\nSpeed: {:.2}",
                                                             cur_yaw_rate_change,
@@ -399,8 +399,8 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                                             telemetry.cur_speed
                                                         );
                                                 }
-                                                if let Some(TelemetryAnnotation::Slip { prev_speed, cur_speed, is_slip: _ }) =
-                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::Slip { prev_speed: _, cur_speed: _, is_slip: _ })) {
+                                                if let Some(TelemetryAnnotation::Slip { prev_speed, cur_speed, .. }) =
+                                                    telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::Slip { .. })) {
                                                         self.selected_annotation_content = format!(
                                                             "Speed: {:.2}\nPrev speed: {:.2}\nThrottle %: {:.2}%\nSteering (rad): {:.2}%",
                                                             cur_speed,
