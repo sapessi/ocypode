@@ -1,20 +1,20 @@
 use std::{path::PathBuf, sync::Arc};
 
 use egui::{
-    style::Widgets, Align, Color32, Direction, Frame, Label, Layout, Margin, RichText, Ui, Vec2b,
-    Visuals,
+    Align, Color32, Direction, Frame, Label, Layout, Margin, RichText, Ui, Vec2b, Visuals,
+    style::Widgets,
 };
 use egui_dropdown::DropDownBox;
 use egui_plot::{Legend, Line, PlotPoints, Points};
 use itertools::Itertools;
 
 use crate::{
+    OcypodeError,
     telemetry::{SessionInfo, TelemetryAnnotation, TelemetryOutput, TelemetryPoint},
     ui::live::{PALETTE_BLACK, PALETTE_BROWN, PALETTE_MAROON, PALETTE_ORANGE},
-    OcypodeError,
 };
 
-use super::{stroke_shade, Alert, DefaultAlert, ScrubSlipAlert};
+use super::{Alert, DefaultAlert, ScrubSlipAlert, stroke_shade};
 
 #[derive(Default, Clone, Debug)]
 struct TelemetryFile {

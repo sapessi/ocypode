@@ -7,7 +7,7 @@ use std::{
 
 use log::warn;
 
-use crate::{telemetry::TelemetryOutput, OcypodeError};
+use crate::{OcypodeError, telemetry::TelemetryOutput};
 
 pub fn write_telemetry(
     file: &PathBuf,

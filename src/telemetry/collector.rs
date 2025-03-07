@@ -7,15 +7,15 @@ use std::{
 use crate::OcypodeError;
 
 use super::{
-    producer::{TelemetryProducer, CONN_RETRY_MAX_WAIT_S},
+    TelemetryAnalyzer, TelemetryAnnotation, TelemetryOutput,
+    producer::{CONN_RETRY_MAX_WAIT_S, TelemetryProducer},
     scrub_analyzer::ScrubAnalyzer,
     short_shifting_analyzer::ShortShiftingAnalyzer,
     slip_analyzer::SlipAnalyzer,
     trailbrake_steering_analyzer::{
-        TrailbrakeSteeringAnalyzer, MAX_TRAILBRAKING_STEERING_ANGLE, MIN_TRAILBRAKING_PCT,
+        MAX_TRAILBRAKING_STEERING_ANGLE, MIN_TRAILBRAKING_PCT, TrailbrakeSteeringAnalyzer,
     },
     wheelspin_analyzer::WheelspinAnalyzer,
-    TelemetryAnalyzer, TelemetryAnnotation, TelemetryOutput,
 };
 
 const REFRESH_RATE_MS: u64 = 100;

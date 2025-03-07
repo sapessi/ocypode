@@ -5,7 +5,7 @@ pub(crate) mod telemetry_view;
 use std::{collections::VecDeque, sync::mpsc::Receiver, time::SystemTime};
 
 use config::AppConfig;
-use egui::{style::Widgets, Color32, ViewportBuilder, ViewportId, Visuals};
+use egui::{Color32, ViewportBuilder, ViewportId, Visuals, style::Widgets};
 use log::error;
 
 use crate::telemetry::{TelemetryOutput, TelemetryPoint};

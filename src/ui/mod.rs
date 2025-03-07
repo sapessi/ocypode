@@ -4,8 +4,8 @@ use egui::{Align, Color32, Image, ImageButton, Layout, Response, RichText, Ui};
 use log::debug;
 
 use crate::{
-    telemetry::{TelemetryAnnotation, TelemetryPoint},
     OcypodeError,
+    telemetry::{TelemetryAnnotation, TelemetryPoint},
 };
 
 pub(crate) mod analysis;

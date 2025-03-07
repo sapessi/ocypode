@@ -6,7 +6,7 @@ use egui_plot::{Line, PlotPoints};
 use crate::ui::stroke_shade;
 
 use super::{
-    LiveTelemetryApp, DEFAULT_BUTTON_CORNER_RADIUS, DEFAULT_WINDOW_CORNER_RADIUS, PALETTE_ORANGE,
+    DEFAULT_BUTTON_CORNER_RADIUS, DEFAULT_WINDOW_CORNER_RADIUS, LiveTelemetryApp, PALETTE_ORANGE,
 };
 
 impl LiveTelemetryApp {

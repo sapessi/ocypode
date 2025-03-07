@@ -2,7 +2,7 @@ use egui::{Align, CornerRadius, Frame, Id, ImageButton, Layout, Sense, ViewportC
 
 use crate::ui::{Alert, DefaultAlert};
 
-use super::{config::AlertsLayout, LiveTelemetryApp, DEFAULT_WINDOW_CORNER_RADIUS};
+use super::{DEFAULT_WINDOW_CORNER_RADIUS, LiveTelemetryApp, config::AlertsLayout};
 
 impl LiveTelemetryApp {
     pub(crate) fn alerts_view(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {

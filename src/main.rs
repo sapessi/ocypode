@@ -9,12 +9,12 @@ use std::{
     thread,
 };
 
-use clap::{arg, Parser, Subcommand};
+use clap::{Parser, Subcommand, arg};
 use egui::Vec2;
 use snafu::Snafu;
-use telemetry::{producer::IRacingTelemetryProducer, TelemetryOutput};
+use telemetry::{TelemetryOutput, producer::IRacingTelemetryProducer};
 use ui::analysis::TelemetryAnalysisApp;
-use ui::live::{config::AppConfig, LiveTelemetryApp, HISTORY_SECONDS};
+use ui::live::{HISTORY_SECONDS, LiveTelemetryApp, config::AppConfig};
 
 #[derive(Debug, Snafu)]
 enum OcypodeError {

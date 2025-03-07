@@ -1,4 +1,4 @@
-use simple_moving_average::{SumTreeSMA, SMA};
+use simple_moving_average::{SMA, SumTreeSMA};
 
 use super::{TelemetryAnalyzer, TelemetryAnnotation};
 
