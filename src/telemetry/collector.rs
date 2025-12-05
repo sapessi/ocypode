@@ -51,6 +51,9 @@ pub fn collect_telemetry(
         writer_sender.send(TelemetryOutput::SessionChange(last_session_info.clone()))?;
     }
 
+    let mut point_no = 0;
+    let game_source = producer.game_source();
+
     loop {
         thread::sleep(Duration::from_millis(REFRESH_RATE_MS));
 
@@ -62,10 +65,12 @@ pub fn collect_telemetry(
             >= SESSION_UPDATE_TIME_MS
         {
             if let Ok(session_info) = producer.session_info() {
-                if session_info.we_session_id != last_session_info.we_session_id
+                // Check for session changes - handle optional fields properly
+                let session_changed = session_info.we_session_id != last_session_info.we_session_id
                     || session_info.we_sub_session_id != last_session_info.we_sub_session_id
-                    || session_info.track_name != last_session_info.track_name
-                {
+                    || session_info.track_name != last_session_info.track_name;
+                
+                if session_changed {
                     last_session_info = session_info.clone();
                     telemetry_sender.send(TelemetryOutput::SessionChange(session_info.clone()))?;
                     if let Some(ref writer_sender) = telemetry_writer_sender {
@@ -80,20 +85,33 @@ pub fn collect_telemetry(
             last_session_info_check_time = SystemTime::now();
         }
 
-        let mut measurement = producer.telemetry()?;
+        // Get telemetry as Box<dyn Moment>
+        let moment = producer.telemetry()?;
+        
+        // Run analyzers on the Moment data
         let mut annotations: Vec<TelemetryAnnotation> = Vec::new();
         for analyzer in analyzers.iter_mut() {
-            //annotations.extend(analyzer.analyze(&measurement, &last_session_info));
-            annotations.append(&mut analyzer.analyze(&measurement, &last_session_info));
+            annotations.append(&mut analyzer.analyze(moment.as_ref(), &last_session_info));
         }
+        
+        // Convert Moment to SerializableTelemetry
+        let mut serializable = super::SerializableTelemetry::from_moment(
+            moment.as_ref(),
+            point_no,
+            game_source,
+        );
+        
+        // Add annotations to the serializable telemetry
         if !annotations.is_empty() {
-            measurement.annotations = annotations;
+            serializable.annotations = annotations;
         }
 
-        telemetry_sender.send(TelemetryOutput::DataPoint(measurement.clone()))?;
+        telemetry_sender.send(TelemetryOutput::DataPoint(serializable.clone()))?;
         if let Some(ref writer_sender) = telemetry_writer_sender {
-            writer_sender.send(TelemetryOutput::DataPoint(measurement.clone()))?;
+            writer_sender.send(TelemetryOutput::DataPoint(serializable.clone()))?;
         }
+        
+        point_no += 1;
     }
 }
 
@@ -122,7 +140,7 @@ fn wait_for_session(producer: &mut impl TelemetryProducer) -> Result<(), Ocypode
 mod tests {
     use super::*;
     use crate::telemetry::producer::MockTelemetryProducer;
-    use crate::telemetry::{TelemetryOutput, TelemetryPoint};
+    use crate::telemetry::{TelemetryOutput, SerializableTelemetry, GameSource};
     use std::sync::mpsc::{self, Receiver, Sender};
     use std::thread;
 
@@ -136,16 +154,30 @@ mod tests {
             mpsc::channel();
 
         let points = vec![
-            TelemetryPoint {
-                cur_gear: 2,
-                cur_rpm: 5000.0,
-                car_shift_ideal_rpm: 5200.0,
+            SerializableTelemetry {
+                point_no: 0,
+                timestamp_ms: 0,
+                game_source: GameSource::IRacing,
+                gear: Some(2),
+                engine_rpm: Some(5000.0),
+                shift_point_rpm: Some(5200.0),
+                speed_mps: Some(50.0),
+                throttle: Some(0.8),
+                brake: Some(0.0),
+                clutch: Some(0.0),
                 ..Default::default()
             },
-            TelemetryPoint {
-                cur_gear: 3,
-                cur_rpm: 5100.0,
-                car_shift_ideal_rpm: 5200.0,
+            SerializableTelemetry {
+                point_no: 1,
+                timestamp_ms: 100,
+                game_source: GameSource::IRacing,
+                gear: Some(3),
+                engine_rpm: Some(5100.0),
+                shift_point_rpm: Some(5200.0),
+                speed_mps: Some(55.0),
+                throttle: Some(0.9),
+                brake: Some(0.0),
+                clutch: Some(0.0),
                 ..Default::default()
             },
         ];
@@ -172,7 +204,7 @@ mod tests {
         for _ in 0..2 {
             let data_point = telemetry_receiver.recv().unwrap();
             if let TelemetryOutput::DataPoint(measurement) = data_point {
-                assert!(measurement.cur_gear == 2 || measurement.cur_gear == 3);
+                assert!(measurement.gear == Some(2) || measurement.gear == Some(3));
             } else {
                 panic!("Expected DataPoint");
             }
@@ -188,7 +220,7 @@ mod tests {
         for _ in 0..2 {
             let writer_data_point = writer_receiver.recv().unwrap();
             if let TelemetryOutput::DataPoint(measurement) = writer_data_point {
-                assert!(measurement.cur_gear == 2 || measurement.cur_gear == 3);
+                assert!(measurement.gear == Some(2) || measurement.gear == Some(3));
             } else {
                 panic!("Expected DataPoint: {:?}", writer_data_point);
             }
@@ -205,16 +237,30 @@ mod tests {
         ) = mpsc::channel();
 
         let points = vec![
-            TelemetryPoint {
-                cur_gear: 2,
-                cur_rpm: 5000.0,
-                car_shift_ideal_rpm: 5200.0,
+            SerializableTelemetry {
+                point_no: 0,
+                timestamp_ms: 0,
+                game_source: GameSource::IRacing,
+                gear: Some(2),
+                engine_rpm: Some(5000.0),
+                shift_point_rpm: Some(5200.0),
+                speed_mps: Some(50.0),
+                throttle: Some(0.8),
+                brake: Some(0.0),
+                clutch: Some(0.0),
                 ..Default::default()
             },
-            TelemetryPoint {
-                cur_gear: 3,
-                cur_rpm: 5100.0,
-                car_shift_ideal_rpm: 5200.0,
+            SerializableTelemetry {
+                point_no: 1,
+                timestamp_ms: 100,
+                game_source: GameSource::IRacing,
+                gear: Some(3),
+                engine_rpm: Some(5100.0),
+                shift_point_rpm: Some(5200.0),
+                speed_mps: Some(55.0),
+                throttle: Some(0.9),
+                brake: Some(0.0),
+                clutch: Some(0.0),
                 ..Default::default()
             },
         ];
@@ -239,7 +285,7 @@ mod tests {
         for _ in 0..2 {
             let data_point = telemetry_receiver.recv().unwrap();
             if let TelemetryOutput::DataPoint(measurement) = data_point {
-                assert!(measurement.cur_gear == 2 || measurement.cur_gear == 3);
+                assert!(measurement.gear == Some(2) || measurement.gear == Some(3));
             } else {
                 panic!("Expected DataPoint");
             }

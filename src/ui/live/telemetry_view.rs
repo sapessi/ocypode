@@ -86,9 +86,12 @@ impl LiveTelemetryApp {
                 let mut steering_vec = Vec::<[f64; 2]>::new();
 
                 self.telemetry_points.iter().enumerate().all(|p| {
-                    throttle_vec.push([p.0 as f64, p.1.throttle as f64 * 100.]);
-                    brake_vec.push([p.0 as f64, p.1.brake as f64 * 100.]);
-                    steering_vec.push([p.0 as f64, 50. + 50. * p.1.steering_pct as f64]);
+                    let throttle = p.1.throttle.unwrap_or(0.0);
+                    let brake = p.1.brake.unwrap_or(0.0);
+                    let steering_pct = p.1.steering_pct.unwrap_or(0.0);
+                    throttle_vec.push([p.0 as f64, throttle as f64 * 100.]);
+                    brake_vec.push([p.0 as f64, brake as f64 * 100.]);
+                    steering_vec.push([p.0 as f64, 50. + 50. * steering_pct as f64]);
                     true
                 });
 

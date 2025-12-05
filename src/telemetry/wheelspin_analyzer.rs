@@ -2,8 +2,10 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 use simple_moving_average::{SMA, SumTreeSMA};
+use simetry::Moment;
+use uom::si::angular_velocity::revolution_per_minute;
 
-use super::{SessionInfo, TelemetryAnalyzer, TelemetryAnnotation, TelemetryPoint};
+use super::{SessionInfo, TelemetryAnalyzer, TelemetryAnnotation};
 
 pub struct WheelspinAnalyzer<const WINDOW_SIZE: usize> {
     cur_averages: HashMap<u32, f32>,
@@ -26,42 +28,52 @@ impl<const WINDOW_SIZE: usize> WheelspinAnalyzer<WINDOW_SIZE> {
 }
 
 impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for WheelspinAnalyzer<WINDOW_SIZE> {
-    fn analyze(&mut self, point: &TelemetryPoint, _: &SessionInfo) -> Vec<TelemetryAnnotation> {
+    fn analyze(&mut self, telemetry: &dyn Moment, _: &SessionInfo) -> Vec<TelemetryAnnotation> {
         // process expected RPM growth by gear
         let mut output = Vec::new();
-        if point.cur_gear != self.prev_gear {
-            self.prev_gear = point.cur_gear;
+        
+        // Extract data from Moment trait
+        let cur_gear = telemetry.vehicle_gear().unwrap_or(0).max(0) as u32;
+        let cur_rpm = telemetry.vehicle_engine_rotation_speed()
+            .map(|rpm| rpm.get::<revolution_per_minute>() as f32)
+            .unwrap_or(0.0);
+        let pedals = telemetry.pedals();
+        let throttle = pedals.as_ref().map(|p| p.throttle as f32).unwrap_or(0.0);
+        let brake = pedals.as_ref().map(|p| p.brake as f32).unwrap_or(0.0);
+        
+        if cur_gear != self.prev_gear {
+            self.prev_gear = cur_gear;
         } else {
-            if point.cur_rpm > self.prev_rpm && point.cur_gear > 0 {
-                let rpm_growth = point.cur_rpm - self.prev_rpm;
+            if cur_rpm > self.prev_rpm && cur_gear > 0 {
+                let rpm_growth = cur_rpm - self.prev_rpm;
 
-                if let Some(cur_average) = self.cur_averages.get(&point.cur_gear) {
+                if let Some(cur_average) = self.cur_averages.get(&cur_gear) {
                     if rpm_growth > *cur_average
-                        && *self.cur_gear_points.entry(point.cur_gear).or_insert(0) >= WINDOW_SIZE
+                        && *self.cur_gear_points.entry(cur_gear).or_insert(0) >= WINDOW_SIZE
                     {
                         output.push(TelemetryAnnotation::Wheelspin {
                             avg_rpm_increase_per_gear: self.cur_averages.clone(),
-                            cur_gear: point.cur_gear,
+                            cur_gear,
                             cur_rpm_increase: rpm_growth,
                             is_wheelspin: true,
                         });
                     }
                 }
                 // we only add a data point to our average if the user is in full acceleration
-                if point.throttle > 0.95 && point.brake == 0. {
+                if throttle > 0.95 && brake == 0. {
                     self.telemetry_window
-                        .entry(point.cur_gear)
+                        .entry(cur_gear)
                         .or_insert_with(SumTreeSMA::new)
                         .add_sample(rpm_growth);
 
-                    if *self.cur_gear_points.entry(point.cur_gear).or_insert(0) < WINDOW_SIZE {
+                    if *self.cur_gear_points.entry(cur_gear).or_insert(0) < WINDOW_SIZE {
                         self.cur_gear_points
-                            .entry(point.cur_gear)
+                            .entry(cur_gear)
                             .and_modify(|e| *e += 1);
                     } else {
-                        *self.cur_averages.entry(point.cur_gear).or_insert(0.) = *self
+                        *self.cur_averages.entry(cur_gear).or_insert(0.) = *self
                             .telemetry_window
-                            .get(&point.cur_gear)
+                            .get(&cur_gear)
                             .unwrap()
                             .get_sample_window_iter()
                             .sorted_by(|a, b| a.partial_cmp(b).unwrap())
@@ -70,7 +82,7 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for WheelspinAnalyzer<WINDOW_SI
                     }
                 }
             }
-            self.prev_rpm = point.cur_rpm;
+            self.prev_rpm = cur_rpm;
         }
 
         output

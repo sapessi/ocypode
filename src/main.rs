@@ -9,14 +9,22 @@ use std::{
     thread,
 };
 
-use clap::{Parser, Subcommand, arg};
+use clap::{Parser, Subcommand, ValueEnum, arg};
 use egui::Vec2;
 use snafu::Snafu;
 use telemetry::{TelemetryOutput};
 #[cfg(windows)]
-use telemetry::producer::IRacingTelemetryProducer;
+use telemetry::producer::{IRacingTelemetryProducer, ACCTelemetryProducer};
 use ui::analysis::TelemetryAnalysisApp;
 use ui::live::{HISTORY_SECONDS, LiveTelemetryApp, config::AppConfig};
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum GameSource {
+    #[value(name = "iracing")]
+    IRacing,
+    #[value(name = "acc")]
+    ACC,
+}
 
 #[derive(Debug, Snafu)]
 enum OcypodeError {
@@ -25,6 +33,10 @@ enum OcypodeError {
     NoIRacingFile { source: io::Error },
     #[snafu(display("Timeout waiting for iRacing session"))]
     IRacingConnectionTimeout,
+
+    // Errors for the ACC client
+    #[snafu(display("Timeout waiting for ACC session"))]
+    ACCConnectionTimeout,
 
     // Errors while reading and broadcasting telemetry data
     #[snafu(display("Missing iRacing client, session not initialized"))]
@@ -53,6 +65,8 @@ enum OcypodeError {
     InvalidTelemetryFile { path: String },
     #[snafu(display("Error loading telemetry file"))]
     TelemetryLoaderError { source: io::Error },
+    #[snafu(display("Legacy telemetry file format detected. This file was created with an older version of Ocypode and is not compatible with the current version. Please re-record your session with the current version."))]
+    LegacyTelemetryFormat,
 }
 
 impl From<SendError<TelemetryOutput>> for OcypodeError {
@@ -79,6 +93,9 @@ enum Commands {
 
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        #[arg(short, long, value_enum)]
+        game: GameSource,
     },
     Load {
         #[arg(short, long)]
@@ -86,61 +103,97 @@ enum Commands {
     },
 }
 
-fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError> {
-    let (telemtry_tx, telemetry_rx) = mpsc::channel::<telemetry::TelemetryOutput>();
-
-    // if we need to write an output file we create a new channel and have the telemetry reader send to both the plotting
-    // and writer channels
-    if let Some(output_file) = output {
-        let (telemetry_writer_tx, telemetry_writer_rx) =
-            mpsc::channel::<telemetry::TelemetryOutput>();
-        #[cfg(windows)]
-        thread::spawn(move || {
-            let telemetry_producer = IRacingTelemetryProducer::default();
-            telemetry::collect_telemetry(
-                telemetry_producer,
-                telemtry_tx,
-                Some(telemetry_writer_tx),
-            )
-            .expect("Error while reading telemetry");
-        });
-        thread::spawn(move || writer::write_telemetry(&output_file, telemetry_writer_rx));
-    } else {
-        #[cfg(windows)]
-        thread::spawn(move || {
-            let telemetry_producer = IRacingTelemetryProducer::default();
-            telemetry::collect_telemetry(telemetry_producer, telemtry_tx, None)
-                .expect("Error while reading telemetry");
+fn live(window_size: usize, output: Option<PathBuf>, game: GameSource) -> Result<(), OcypodeError> {
+    #[cfg(not(windows))]
+    {
+        eprintln!("Error: Live telemetry is only supported on Windows");
+        eprintln!("Supported games: iracing, acc");
+        return Err(OcypodeError::TelemetryProducerError {
+            description: "Live telemetry is only supported on Windows".to_string(),
         });
     }
 
-    let app_config = AppConfig::from_local_file().unwrap_or(AppConfig {
-        window_size_s: window_size,
-        ..Default::default()
-    });
-    let telemetry_window_position = app_config.telemetry_window_position.clone();
+    #[cfg(windows)]
+    {
+        let (telemtry_tx, telemetry_rx) = mpsc::channel::<telemetry::TelemetryOutput>();
 
-    let mut native_options = eframe::NativeOptions::default();
-    native_options.viewport = native_options
-        .viewport
-        .with_always_on_top()
-        .with_decorations(false)
-        .with_transparent(true)
-        .with_inner_size(Vec2::new(500., 200.))
-        .with_position(telemetry_window_position);
+        // if we need to write an output file we create a new channel and have the telemetry reader send to both the plotting
+        // and writer channels
+        if let Some(output_file) = output {
+            let (telemetry_writer_tx, telemetry_writer_rx) =
+                mpsc::channel::<telemetry::TelemetryOutput>();
+            
+            thread::spawn(move || {
+                // Instantiate the correct producer based on the game parameter
+                match game {
+                    GameSource::IRacing => {
+                        let telemetry_producer = IRacingTelemetryProducer::default();
+                        telemetry::collect_telemetry(
+                            telemetry_producer,
+                            telemtry_tx,
+                            Some(telemetry_writer_tx),
+                        )
+                        .expect("Error while reading telemetry");
+                    }
+                    GameSource::ACC => {
+                        let telemetry_producer = ACCTelemetryProducer::default();
+                        telemetry::collect_telemetry(
+                            telemetry_producer,
+                            telemtry_tx,
+                            Some(telemetry_writer_tx),
+                        )
+                        .expect("Error while reading telemetry");
+                    }
+                }
+            });
+            thread::spawn(move || writer::write_telemetry(&output_file, telemetry_writer_rx));
+        } else {
+            thread::spawn(move || {
+                // Instantiate the correct producer based on the game parameter
+                match game {
+                    GameSource::IRacing => {
+                        let telemetry_producer = IRacingTelemetryProducer::default();
+                        telemetry::collect_telemetry(telemetry_producer, telemtry_tx, None)
+                            .expect("Error while reading telemetry");
+                    }
+                    GameSource::ACC => {
+                        let telemetry_producer = ACCTelemetryProducer::default();
+                        telemetry::collect_telemetry(telemetry_producer, telemtry_tx, None)
+                            .expect("Error while reading telemetry");
+                    }
+                }
+            });
+        }
 
-    eframe::run_native(
-        "Ocypode",
-        native_options,
-        Box::new(|cc| {
-            Ok(Box::new(LiveTelemetryApp::new(
-                telemetry_rx,
-                app_config,
-                cc,
-            )))
-        }),
-    )
-    .expect("could not start app");
+        let app_config = AppConfig::from_local_file().unwrap_or(AppConfig {
+            window_size_s: window_size,
+            ..Default::default()
+        });
+        let telemetry_window_position = app_config.telemetry_window_position.clone();
+
+        let mut native_options = eframe::NativeOptions::default();
+        native_options.viewport = native_options
+            .viewport
+            .with_always_on_top()
+            .with_decorations(false)
+            .with_transparent(true)
+            .with_inner_size(Vec2::new(500., 200.))
+            .with_position(telemetry_window_position);
+
+        eframe::run_native(
+            "Ocypode",
+            native_options,
+            Box::new(|cc| {
+                Ok(Box::new(LiveTelemetryApp::new(
+                    telemetry_rx,
+                    app_config,
+                    cc,
+                )))
+            }),
+        )
+        .expect("could not start app");
+    }
+    
     Ok(())
 }
 
@@ -173,8 +226,8 @@ fn main() {
         Commands::Load { input } => {
             load(input).expect("Error while analyzing telemetry file");
         }
-        Commands::Live { window, output } => {
-            live(*window, output.clone()).expect("Error while running live telemetry")
+        Commands::Live { window, output, game } => {
+            live(*window, output.clone(), *game).expect("Error while running live telemetry")
         }
     };
 }

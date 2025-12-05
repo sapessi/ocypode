@@ -5,17 +5,17 @@ use log::debug;
 
 use crate::{
     OcypodeError,
-    telemetry::{TelemetryAnnotation, TelemetryPoint},
+    telemetry::{TelemetryAnnotation, SerializableTelemetry},
 };
 
 pub(crate) mod analysis;
 pub(crate) mod live;
 
 const ALERT_DURATION_MS: u128 = 500;
-pub(crate) type AlertImageSelector<'a> = fn(&TelemetryPoint) -> Image<'a>;
+pub(crate) type AlertImageSelector<'a> = fn(&SerializableTelemetry) -> Image<'a>;
 
 pub(crate) trait Alert {
-    fn update_state(&mut self, telemetry_point: &TelemetryPoint) -> Result<(), OcypodeError>;
+    fn update_state(&mut self, telemetry_point: &SerializableTelemetry) -> Result<(), OcypodeError>;
     fn show(&mut self, ui: &mut Ui, align: Align) -> Response;
 }
 
@@ -31,7 +31,7 @@ impl<'i> DefaultAlert<'i> {
         Self {
             image_selector,
             text,
-            current_image: image_selector(&TelemetryPoint::default()),
+            current_image: image_selector(&SerializableTelemetry::default()),
             is_button: false,
         }
     }
@@ -39,10 +39,12 @@ impl<'i> DefaultAlert<'i> {
     pub(crate) fn abs() -> Self {
         Self::with_image("ABS".to_string(), |telemetry| {
             let mut abs_image = egui::include_image!("../../assets/brake-green.png");
-            if telemetry.brake > 0.4 && !telemetry.abs_active {
+            let brake = telemetry.brake.unwrap_or(0.0);
+            let abs_active = telemetry.abs_active.unwrap_or(false);
+            if brake > 0.4 && !abs_active {
                 abs_image = egui::include_image!("../../assets/brake-orange.png");
             }
-            if telemetry.abs_active {
+            if abs_active {
                 abs_image = egui::include_image!("../../assets/brake-red.png");
             }
             abs_image.into()
@@ -52,12 +54,15 @@ impl<'i> DefaultAlert<'i> {
     pub(crate) fn shift() -> Self {
         Self::with_image("Shift".to_string(), |telemetry| {
             let mut shift_image = egui::include_image!("../../assets/shift-grey.png");
-            if telemetry.cur_rpm > telemetry.car_shift_ideal_rpm - 100.
-                && telemetry.cur_rpm < telemetry.car_shift_ideal_rpm + 100.
+            let cur_rpm = telemetry.engine_rpm.unwrap_or(0.0);
+            let shift_rpm = telemetry.shift_point_rpm.unwrap_or(0.0);
+            
+            if cur_rpm > shift_rpm - 100.
+                && cur_rpm < shift_rpm + 100.
             {
                 shift_image = egui::include_image!("../../assets/shift-green.png");
             }
-            if telemetry.cur_rpm > telemetry.car_shift_ideal_rpm + 100. {
+            if cur_rpm > shift_rpm + 100. {
                 shift_image = egui::include_image!("../../assets/shift-red.png");
             }
 
@@ -106,7 +111,8 @@ impl<'i> DefaultAlert<'i> {
         Self::with_image("Trailbraking".to_string(), |telemetry| {
             let mut trailbrake_image = egui::include_image!("../../assets/steering-grey.png");
             // trailbrake steering analyzer
-            if telemetry.brake > 0.05 {
+            let brake = telemetry.brake.unwrap_or(0.0);
+            if brake > 0.05 {
                 trailbrake_image = egui::include_image!("../../assets/steering-green.png");
             }
             telemetry.annotations.iter().find(|p| match p {
@@ -133,7 +139,7 @@ impl<'i> DefaultAlert<'i> {
 }
 
 impl Alert for DefaultAlert<'_> {
-    fn update_state(&mut self, telemetry_point: &TelemetryPoint) -> Result<(), OcypodeError> {
+    fn update_state(&mut self, telemetry_point: &SerializableTelemetry) -> Result<(), OcypodeError> {
         self.current_image = (self.image_selector)(telemetry_point);
         Ok(())
     }
@@ -177,7 +183,7 @@ impl ScrubSlipAlert {
 }
 
 impl Alert for ScrubSlipAlert {
-    fn update_state(&mut self, telemetry_point: &TelemetryPoint) -> Result<(), OcypodeError> {
+    fn update_state(&mut self, telemetry_point: &SerializableTelemetry) -> Result<(), OcypodeError> {
         for annotation in &telemetry_point.annotations {
             match annotation {
                 TelemetryAnnotation::Slip {
