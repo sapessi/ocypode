@@ -12,7 +12,9 @@ use std::{
 use clap::{Parser, Subcommand, arg};
 use egui::Vec2;
 use snafu::Snafu;
-use telemetry::{TelemetryOutput, producer::IRacingTelemetryProducer};
+use telemetry::{TelemetryOutput};
+#[cfg(windows)]
+use telemetry::producer::IRacingTelemetryProducer;
 use ui::analysis::TelemetryAnalysisApp;
 use ui::live::{HISTORY_SECONDS, LiveTelemetryApp, config::AppConfig};
 
@@ -92,6 +94,7 @@ fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError>
     if let Some(output_file) = output {
         let (telemetry_writer_tx, telemetry_writer_rx) =
             mpsc::channel::<telemetry::TelemetryOutput>();
+        #[cfg(windows)]
         thread::spawn(move || {
             let telemetry_producer = IRacingTelemetryProducer::default();
             telemetry::collect_telemetry(
@@ -103,6 +106,7 @@ fn live(window_size: usize, output: Option<PathBuf>) -> Result<(), OcypodeError>
         });
         thread::spawn(move || writer::write_telemetry(&output_file, telemetry_writer_rx));
     } else {
+        #[cfg(windows)]
         thread::spawn(move || {
             let telemetry_producer = IRacingTelemetryProducer::default();
             telemetry::collect_telemetry(telemetry_producer, telemtry_tx, None)

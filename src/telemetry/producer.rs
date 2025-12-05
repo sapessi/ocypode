@@ -3,6 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+#[cfg(windows)]
 use iracing::telemetry::{Connection, Sample};
 use log::{error, warn};
 
@@ -24,6 +25,7 @@ pub trait SimplifiedTelemetryAccess {
     fn get_rr_tire_info(&self) -> Option<TireInfo>;
 }
 
+#[cfg(windows)]
 impl SimplifiedTelemetryAccess for Sample {
     fn get_float(&self, name: &'static str) -> Option<f32> {
         if let Ok(value) = self.get(name) {
@@ -112,6 +114,7 @@ pub trait TelemetryProducer {
     fn telemetry(&mut self) -> Result<TelemetryPoint, OcypodeError>;
 }
 
+#[cfg(windows)]
 pub(crate) struct IRacingTelemetryProducer {
     client: Option<Connection>,
     retry_wait_ms: u64,
@@ -119,12 +122,14 @@ pub(crate) struct IRacingTelemetryProducer {
     point_no: usize,
 }
 
+#[cfg(windows)]
 impl Default for IRacingTelemetryProducer {
     fn default() -> Self {
         IRacingTelemetryProducer::new(CONN_RETRY_WAIT_MS, CONN_RETRY_MAX_WAIT_S)
     }
 }
 
+#[cfg(windows)]
 impl IRacingTelemetryProducer {
     pub fn new(retry_wait_ms: u64, retry_timeout_s: u64) -> Self {
         Self {
@@ -135,7 +140,7 @@ impl IRacingTelemetryProducer {
         }
     }
 }
-
+#[cfg(windows)]
 impl TelemetryProducer for IRacingTelemetryProducer {
     fn start(&mut self) -> Result<(), OcypodeError> {
         let start_time = SystemTime::now();
