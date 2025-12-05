@@ -232,7 +232,8 @@ mod tests {
                 point_no: i,
                 ..Default::default()
             };
-            tx.send(TelemetryOutput::DataPoint(Box::new(telemetry))).unwrap();
+            tx.send(TelemetryOutput::DataPoint(Box::new(telemetry)))
+                .unwrap();
         }
         drop(tx);
 
