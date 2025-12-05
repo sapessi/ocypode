@@ -1,5 +1,4 @@
-use super::{SessionInfo, TelemetryAnalyzer};
-use simetry::Moment;
+use super::{SessionInfo, TelemetryAnalyzer, TelemetryData};
 
 pub(crate) const MIN_TRAILBRAKING_PCT: f32 = 0.2;
 pub(crate) const MAX_TRAILBRAKING_STEERING_ANGLE: f32 = 0.1;
@@ -21,27 +20,22 @@ impl TrailbrakeSteeringAnalyzer {
 impl TelemetryAnalyzer for TrailbrakeSteeringAnalyzer {
     fn analyze(
         &mut self,
-        telemetry: &dyn Moment,
+        telemetry: &TelemetryData,
         session_info: &SessionInfo,
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
         
-        // Extract data from Moment trait
-        let pedals = telemetry.pedals();
-        let brake = pedals.as_ref().map(|p| p.brake as f32).unwrap_or(0.0);
-        
-        // Note: steering and steering_pct are not available in the base Moment trait
-        // For now, we'll use placeholder values
-        // This will need to be addressed when game-specific implementations are available
-        let steering = 0.0f32; // TODO: Extract from game-specific Moment implementation
-        let steering_pct = 0.0f32; // TODO: Extract from game-specific Moment implementation
+        // Extract brake and steering data from TelemetryData
+        let brake = telemetry.brake.unwrap_or(0.0);
+        let steering_angle_rad = telemetry.steering_angle_rad.unwrap_or(0.0);
+        let steering_pct = telemetry.steering_pct.unwrap_or(0.0);
         
         // nothing to process here if we cannot establish the current steering pct
         if session_info.max_steering_angle == 0. {
             return output;
         }
         // this should not be possible
-        if steering > session_info.max_steering_angle {
+        if steering_angle_rad > session_info.max_steering_angle {
             return output;
         }
 
@@ -60,7 +54,7 @@ impl TelemetryAnalyzer for TrailbrakeSteeringAnalyzer {
 
 #[cfg(test)]
 mod tests {
-    use crate::telemetry::{MockMoment, SerializableTelemetry, GameSource};
+    use crate::telemetry::{TelemetryData, GameSource};
 
     use super::*;
 
@@ -72,28 +66,26 @@ mod tests {
     fn test_fails_if_no_max_steering() {
         let mut analyzer = default_analyzer();
         let telemetry_data = create_default_telemetry();
-        let moment = MockMoment::new(telemetry_data);
-        let annotations = analyzer.analyze(&moment, &SessionInfo::default());
+        let annotations = analyzer.analyze(&telemetry_data, &SessionInfo::default());
         assert!(annotations.is_empty());
     }
 
     #[test]
     fn test_doesnt_fire_with_low_brake() {
         let mut analyzer = default_analyzer();
-        let telemetry_data = SerializableTelemetry {
+        let telemetry_data = TelemetryData {
             brake: Some(0.1),
             ..create_default_telemetry()
         };
-        let moment = MockMoment::new(telemetry_data);
         let session_info = SessionInfo {
             max_steering_angle: 0.5,
             ..Default::default()
         };
-        assert!(analyzer.analyze(&moment, &session_info).is_empty());
+        assert!(analyzer.analyze(&telemetry_data, &session_info).is_empty());
     }
     
-    fn create_default_telemetry() -> SerializableTelemetry {
-        SerializableTelemetry {
+    fn create_default_telemetry() -> TelemetryData {
+        TelemetryData {
             point_no: 0,
             timestamp_ms: 0,
             game_source: GameSource::IRacing,
@@ -105,26 +97,26 @@ mod tests {
             throttle: Some(0.0),
             brake: Some(0.0),
             clutch: Some(0.0),
-            steering: None,
+            steering_angle_rad: None,
             steering_pct: None,
-            lap_distance: None,
+            lap_distance_m: None,
             lap_distance_pct: None,
             lap_number: None,
             last_lap_time_s: None,
             best_lap_time_s: None,
             is_pit_limiter_engaged: None,
             is_in_pit_lane: None,
-            abs_active: None,
-            lat: None,
-            lon: None,
-            lat_accel: None,
-            lon_accel: None,
-            pitch: None,
-            pitch_rate: None,
-            roll: None,
-            roll_rate: None,
-            yaw: None,
-            yaw_rate: None,
+            is_abs_active: None,
+            latitude_deg: None,
+            longitude_deg: None,
+            lateral_accel_mps2: None,
+            longitudinal_accel_mps2: None,
+            pitch_rad: None,
+            pitch_rate_rps: None,
+            roll_rad: None,
+            roll_rate_rps: None,
+            yaw_rad: None,
+            yaw_rate_rps: None,
             lf_tire_info: None,
             rf_tire_info: None,
             lr_tire_info: None,

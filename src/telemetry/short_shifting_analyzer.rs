@@ -1,8 +1,6 @@
 use std::default;
-use simetry::Moment;
-use uom::si::angular_velocity::revolution_per_minute;
 
-use super::{TelemetryAnalyzer, TelemetryAnnotation};
+use super::{TelemetryAnalyzer, TelemetryAnnotation, TelemetryData};
 
 const DEFAULT_SHORT_SHIFT_SENSITIVITY: f32 = 100.;
 
@@ -25,19 +23,15 @@ impl default::Default for ShortShiftingAnalyzer {
 impl TelemetryAnalyzer for ShortShiftingAnalyzer {
     fn analyze(
         &mut self,
-        telemetry: &dyn Moment,
+        telemetry: &TelemetryData,
         _session_info: &super::SessionInfo,
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
         
-        // Extract data from Moment trait
-        let cur_gear = telemetry.vehicle_gear().unwrap_or(0);
-        let cur_rpm = telemetry.vehicle_engine_rotation_speed()
-            .map(|rpm| rpm.get::<revolution_per_minute>() as f32)
-            .unwrap_or(0.0);
-        let shift_point_rpm = telemetry.shift_point()
-            .map(|rpm| rpm.get::<revolution_per_minute>() as f32)
-            .unwrap_or(0.0);
+        // Extract data from TelemetryData
+        let cur_gear = telemetry.gear.unwrap_or(0);
+        let cur_rpm = telemetry.engine_rpm.unwrap_or(0.0);
+        let shift_point_rpm = telemetry.shift_point_rpm.unwrap_or(0.0);
         
         if self.prev_rpm > 0.
             && self.prev_gear > 0
@@ -63,31 +57,29 @@ impl TelemetryAnalyzer for ShortShiftingAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::telemetry::{SessionInfo, TelemetryAnnotation, MockMoment, SerializableTelemetry, GameSource};
+    use crate::telemetry::{SessionInfo, TelemetryAnnotation, TelemetryData, GameSource};
 
     #[test]
     fn test_short_shift_annotation_inserted() {
         let mut analyzer = ShortShiftingAnalyzer::default();
-        let telemetry_data = SerializableTelemetry {
+        let telemetry_data = TelemetryData {
             gear: Some(2),
             engine_rpm: Some(5000.0),
             shift_point_rpm: Some(6200.0),
             ..create_default_telemetry()
         };
-        let moment = MockMoment::new(telemetry_data);
         let session_info = SessionInfo::default();
 
-        let mut output = analyzer.analyze(&moment, &session_info);
+        let mut output = analyzer.analyze(&telemetry_data, &session_info);
         assert!(output.is_empty());
         
-        let telemetry_data2 = SerializableTelemetry {
+        let telemetry_data2 = TelemetryData {
             gear: Some(3),
             engine_rpm: Some(5100.0),
             shift_point_rpm: Some(6200.0),
             ..create_default_telemetry()
         };
-        let moment2 = MockMoment::new(telemetry_data2);
-        output = analyzer.analyze(&moment2, &session_info);
+        output = analyzer.analyze(&telemetry_data2, &session_info);
         assert_eq!(output.len(), 1);
         assert!(match output.first().unwrap() {
             TelemetryAnnotation::ShortShifting {
@@ -102,30 +94,28 @@ mod tests {
     #[test]
     fn test_no_short_shift_annotation() {
         let mut analyzer = ShortShiftingAnalyzer::default();
-        let telemetry_data = SerializableTelemetry {
+        let telemetry_data = TelemetryData {
             gear: Some(2),
             engine_rpm: Some(5100.0),
             shift_point_rpm: Some(5200.0),
             ..create_default_telemetry()
         };
-        let moment = MockMoment::new(telemetry_data);
         let session_info = SessionInfo::default();
 
-        analyzer.analyze(&moment, &session_info);
+        analyzer.analyze(&telemetry_data, &session_info);
         
-        let telemetry_data2 = SerializableTelemetry {
+        let telemetry_data2 = TelemetryData {
             gear: Some(3),
             engine_rpm: Some(5110.0),
             shift_point_rpm: Some(5200.0),
             ..create_default_telemetry()
         };
-        let moment2 = MockMoment::new(telemetry_data2);
-        let output = analyzer.analyze(&moment2, &session_info);
+        let output = analyzer.analyze(&telemetry_data2, &session_info);
         assert!(output.is_empty());
     }
     
-    fn create_default_telemetry() -> SerializableTelemetry {
-        SerializableTelemetry {
+    fn create_default_telemetry() -> TelemetryData {
+        TelemetryData {
             point_no: 0,
             timestamp_ms: 0,
             game_source: GameSource::IRacing,
@@ -137,26 +127,26 @@ mod tests {
             throttle: Some(0.0),
             brake: Some(0.0),
             clutch: Some(0.0),
-            steering: None,
+            steering_angle_rad: None,
             steering_pct: None,
-            lap_distance: None,
+            lap_distance_m: None,
             lap_distance_pct: None,
             lap_number: None,
             last_lap_time_s: None,
             best_lap_time_s: None,
             is_pit_limiter_engaged: None,
             is_in_pit_lane: None,
-            abs_active: None,
-            lat: None,
-            lon: None,
-            lat_accel: None,
-            lon_accel: None,
-            pitch: None,
-            pitch_rate: None,
-            roll: None,
-            roll_rate: None,
-            yaw: None,
-            yaw_rate: None,
+            is_abs_active: None,
+            latitude_deg: None,
+            longitude_deg: None,
+            lateral_accel_mps2: None,
+            longitudinal_accel_mps2: None,
+            pitch_rad: None,
+            pitch_rate_rps: None,
+            roll_rad: None,
+            roll_rate_rps: None,
+            yaw_rad: None,
+            yaw_rate_rps: None,
             lf_tire_info: None,
             rf_tire_info: None,
             lr_tire_info: None,

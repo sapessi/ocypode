@@ -1,6 +1,4 @@
-use super::TelemetryAnalyzer;
-use simetry::Moment;
-use uom::si::velocity::meter_per_second;
+use super::{TelemetryAnalyzer, TelemetryData};
 
 pub(crate) const STEERING_ANGLE_DEADZONE_RAD: f32 = 0.08;
 
@@ -15,24 +13,16 @@ pub(crate) struct SlipAnalyzer {
 impl TelemetryAnalyzer for SlipAnalyzer {
     fn analyze(
         &mut self,
-        telemetry: &dyn Moment,
+        telemetry: &TelemetryData,
         _session_info: &super::SessionInfo,
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
 
-        // Extract data from Moment trait
-        let pedals = telemetry.pedals();
-        let brake = pedals.as_ref().map(|p| p.brake as f32).unwrap_or(0.0);
-        let throttle = pedals.as_ref().map(|p| p.throttle as f32).unwrap_or(0.0);
-        
-        // Note: steering angle is not available in the base Moment trait
-        // For now, we'll use a placeholder value of 0.0
-        // This will need to be addressed when game-specific implementations are available
-        let steering = 0.0f32; // TODO: Extract from game-specific Moment implementation
-        
-        let cur_speed = telemetry.vehicle_velocity()
-            .map(|v| v.get::<meter_per_second>() as f32)
-            .unwrap_or(0.0);
+        // Extract data from TelemetryData
+        let brake = telemetry.brake.unwrap_or(0.0);
+        let throttle = telemetry.throttle.unwrap_or(0.0);
+        let steering = telemetry.steering_angle_rad.unwrap_or(0.0).abs();
+        let cur_speed = telemetry.speed_mps.unwrap_or(0.0);
 
         if brake == 0.
             && throttle >= self.prev_throttle
@@ -58,73 +48,99 @@ impl TelemetryAnalyzer for SlipAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::telemetry::{SessionInfo, TelemetryAnnotation, MockMoment, SerializableTelemetry, GameSource};
+    use crate::telemetry::{SessionInfo, TelemetryAnnotation, TelemetryData, GameSource};
 
     #[test]
     fn test_slip_annotation_inserted() {
         let mut analyzer = SlipAnalyzer::default();
-        let telemetry_data = SerializableTelemetry {
+        let telemetry_data = TelemetryData {
             throttle: Some(0.5),
             brake: Some(0.0),
             speed_mps: Some(50.0),
+            steering_angle_rad: Some(0.15), // Above deadzone
             ..create_default_telemetry()
         };
-        let moment = MockMoment::new(telemetry_data);
         let session_info = SessionInfo::default();
 
         // Initial state
         analyzer.prev_throttle = 0.4;
         analyzer.prev_speed = 55.0;
 
-        let output = analyzer.analyze(&moment, &session_info);
-        // Note: This test may not produce slip annotation because steering is not available
-        // from the base Moment trait. This is expected behavior until game-specific
-        // implementations provide steering data.
-        assert!(output.len() <= 1);
+        let output = analyzer.analyze(&telemetry_data, &session_info);
+        // Should produce slip annotation: brake=0, throttle increasing, steering > deadzone, speed decreasing
+        assert_eq!(output.len(), 1);
+        match &output[0] {
+            TelemetryAnnotation::Slip { prev_speed, cur_speed, is_slip } => {
+                assert_eq!(*prev_speed, 55.0);
+                assert_eq!(*cur_speed, 50.0);
+                assert!(is_slip);
+            }
+            _ => panic!("Expected Slip annotation"),
+        }
     }
 
     #[test]
     fn test_no_slip_annotation_due_to_brake() {
         let mut analyzer = SlipAnalyzer::default();
-        let telemetry_data = SerializableTelemetry {
+        let telemetry_data = TelemetryData {
             throttle: Some(0.5),
             brake: Some(0.1),
             speed_mps: Some(50.0),
+            steering_angle_rad: Some(0.15),
             ..create_default_telemetry()
         };
-        let moment = MockMoment::new(telemetry_data);
         let session_info = SessionInfo::default();
 
         // Initial state
         analyzer.prev_throttle = 0.4;
         analyzer.prev_speed = 55.0;
 
-        let output = analyzer.analyze(&moment, &session_info);
+        let output = analyzer.analyze(&telemetry_data, &session_info);
         assert!(output.is_empty());
     }
 
     #[test]
     fn test_no_slip_annotation_due_to_speed() {
         let mut analyzer = SlipAnalyzer::default();
-        let telemetry_data = SerializableTelemetry {
+        let telemetry_data = TelemetryData {
             throttle: Some(0.5),
             brake: Some(0.0),
             speed_mps: Some(60.0),
+            steering_angle_rad: Some(0.15),
             ..create_default_telemetry()
         };
-        let moment = MockMoment::new(telemetry_data);
         let session_info = SessionInfo::default();
 
         // Initial state
         analyzer.prev_throttle = 0.4;
         analyzer.prev_speed = 55.0;
 
-        let output = analyzer.analyze(&moment, &session_info);
+        let output = analyzer.analyze(&telemetry_data, &session_info);
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn test_no_slip_annotation_due_to_low_steering() {
+        let mut analyzer = SlipAnalyzer::default();
+        let telemetry_data = TelemetryData {
+            throttle: Some(0.5),
+            brake: Some(0.0),
+            speed_mps: Some(50.0),
+            steering_angle_rad: Some(0.05), // Below deadzone
+            ..create_default_telemetry()
+        };
+        let session_info = SessionInfo::default();
+
+        // Initial state
+        analyzer.prev_throttle = 0.4;
+        analyzer.prev_speed = 55.0;
+
+        let output = analyzer.analyze(&telemetry_data, &session_info);
         assert!(output.is_empty());
     }
     
-    fn create_default_telemetry() -> SerializableTelemetry {
-        SerializableTelemetry {
+    fn create_default_telemetry() -> TelemetryData {
+        TelemetryData {
             point_no: 0,
             timestamp_ms: 0,
             game_source: GameSource::IRacing,
@@ -136,26 +152,26 @@ mod tests {
             throttle: Some(0.0),
             brake: Some(0.0),
             clutch: Some(0.0),
-            steering: None,
+            steering_angle_rad: None,
             steering_pct: None,
-            lap_distance: None,
+            lap_distance_m: None,
             lap_distance_pct: None,
             lap_number: None,
             last_lap_time_s: None,
             best_lap_time_s: None,
             is_pit_limiter_engaged: None,
             is_in_pit_lane: None,
-            abs_active: None,
-            lat: None,
-            lon: None,
-            lat_accel: None,
-            lon_accel: None,
-            pitch: None,
-            pitch_rate: None,
-            roll: None,
-            roll_rate: None,
-            yaw: None,
-            yaw_rate: None,
+            is_abs_active: None,
+            latitude_deg: None,
+            longitude_deg: None,
+            lateral_accel_mps2: None,
+            longitudinal_accel_mps2: None,
+            pitch_rad: None,
+            pitch_rate_rps: None,
+            roll_rad: None,
+            roll_rate_rps: None,
+            yaw_rad: None,
+            yaw_rate_rps: None,
             lf_tire_info: None,
             rf_tire_info: None,
             lr_tire_info: None,

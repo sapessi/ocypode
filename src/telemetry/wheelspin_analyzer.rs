@@ -2,10 +2,8 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 use simple_moving_average::{SMA, SumTreeSMA};
-use simetry::Moment;
-use uom::si::angular_velocity::revolution_per_minute;
 
-use super::{SessionInfo, TelemetryAnalyzer, TelemetryAnnotation};
+use super::{SessionInfo, TelemetryAnalyzer, TelemetryAnnotation, TelemetryData};
 
 pub struct WheelspinAnalyzer<const WINDOW_SIZE: usize> {
     cur_averages: HashMap<u32, f32>,
@@ -28,18 +26,15 @@ impl<const WINDOW_SIZE: usize> WheelspinAnalyzer<WINDOW_SIZE> {
 }
 
 impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for WheelspinAnalyzer<WINDOW_SIZE> {
-    fn analyze(&mut self, telemetry: &dyn Moment, _: &SessionInfo) -> Vec<TelemetryAnnotation> {
+    fn analyze(&mut self, telemetry: &TelemetryData, _: &SessionInfo) -> Vec<TelemetryAnnotation> {
         // process expected RPM growth by gear
         let mut output = Vec::new();
         
-        // Extract data from Moment trait
-        let cur_gear = telemetry.vehicle_gear().unwrap_or(0).max(0) as u32;
-        let cur_rpm = telemetry.vehicle_engine_rotation_speed()
-            .map(|rpm| rpm.get::<revolution_per_minute>() as f32)
-            .unwrap_or(0.0);
-        let pedals = telemetry.pedals();
-        let throttle = pedals.as_ref().map(|p| p.throttle as f32).unwrap_or(0.0);
-        let brake = pedals.as_ref().map(|p| p.brake as f32).unwrap_or(0.0);
+        // Extract data from TelemetryData
+        let cur_gear = telemetry.gear.unwrap_or(0).max(0) as u32;
+        let cur_rpm = telemetry.engine_rpm.unwrap_or(0.0);
+        let throttle = telemetry.throttle.unwrap_or(0.0);
+        let brake = telemetry.brake.unwrap_or(0.0);
         
         if cur_gear != self.prev_gear {
             self.prev_gear = cur_gear;

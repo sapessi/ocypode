@@ -5,17 +5,17 @@ use log::debug;
 
 use crate::{
     OcypodeError,
-    telemetry::{TelemetryAnnotation, SerializableTelemetry},
+    telemetry::{TelemetryAnnotation, TelemetryData},
 };
 
 pub(crate) mod analysis;
 pub(crate) mod live;
 
 const ALERT_DURATION_MS: u128 = 500;
-pub(crate) type AlertImageSelector<'a> = fn(&SerializableTelemetry) -> Image<'a>;
+pub(crate) type AlertImageSelector<'a> = fn(&TelemetryData) -> Image<'a>;
 
 pub(crate) trait Alert {
-    fn update_state(&mut self, telemetry_point: &SerializableTelemetry) -> Result<(), OcypodeError>;
+    fn update_state(&mut self, telemetry_point: &TelemetryData) -> Result<(), OcypodeError>;
     fn show(&mut self, ui: &mut Ui, align: Align) -> Response;
 }
 
@@ -31,7 +31,7 @@ impl<'i> DefaultAlert<'i> {
         Self {
             image_selector,
             text,
-            current_image: image_selector(&SerializableTelemetry::default()),
+            current_image: image_selector(&TelemetryData::default()),
             is_button: false,
         }
     }
@@ -40,7 +40,7 @@ impl<'i> DefaultAlert<'i> {
         Self::with_image("ABS".to_string(), |telemetry| {
             let mut abs_image = egui::include_image!("../../assets/brake-green.png");
             let brake = telemetry.brake.unwrap_or(0.0);
-            let abs_active = telemetry.abs_active.unwrap_or(false);
+            let abs_active = telemetry.is_abs_active.unwrap_or(false);
             if brake > 0.4 && !abs_active {
                 abs_image = egui::include_image!("../../assets/brake-orange.png");
             }
@@ -139,7 +139,7 @@ impl<'i> DefaultAlert<'i> {
 }
 
 impl Alert for DefaultAlert<'_> {
-    fn update_state(&mut self, telemetry_point: &SerializableTelemetry) -> Result<(), OcypodeError> {
+    fn update_state(&mut self, telemetry_point: &TelemetryData) -> Result<(), OcypodeError> {
         self.current_image = (self.image_selector)(telemetry_point);
         Ok(())
     }
@@ -183,7 +183,7 @@ impl ScrubSlipAlert {
 }
 
 impl Alert for ScrubSlipAlert {
-    fn update_state(&mut self, telemetry_point: &SerializableTelemetry) -> Result<(), OcypodeError> {
+    fn update_state(&mut self, telemetry_point: &TelemetryData) -> Result<(), OcypodeError> {
         for annotation in &telemetry_point.annotations {
             match annotation {
                 TelemetryAnnotation::Slip {

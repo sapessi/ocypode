@@ -1,14 +1,10 @@
-use std::{
-    thread,
-    time::{Duration, SystemTime},
-};
+use std::time::Duration;
 
-use log::{error, warn};
-use simetry::Moment;
+use log::error;
 
 use crate::OcypodeError;
 
-use super::{GameSource, MockMoment, SerializableTelemetry, SessionInfo};
+use super::{GameSource, SessionInfo, TelemetryData, TelemetryOutput};
 
 const CONN_RETRY_WAIT_MS: u64 = 200;
 const MAX_STEERING_ANGLE_DEFAULT: f32 = std::f32::consts::PI;
@@ -17,14 +13,15 @@ pub(crate) const CONN_RETRY_MAX_WAIT_S: u64 = 600;
 /// A trait for producing telemetry data from racing simulation games.
 /// 
 /// This trait abstracts the telemetry data source, allowing the application to work with
-/// multiple racing games through the simetry library's unified interface. Implementations
+/// multiple racing games through a unified intermediate representation. Implementations
 /// can connect to live game sessions or provide mock data for testing and offline analysis.
 /// 
 /// # Type System
 /// 
-/// The trait returns `Box<dyn Moment>` from the `telemetry()` method, where `Moment` is
-/// simetry's trait for accessing telemetry data. This allows different game-specific
-/// implementations to return their own telemetry types while maintaining a common interface.
+/// The trait returns `TelemetryData` from the `telemetry()` method, which is a unified
+/// intermediate representation that captures all possible telemetry data points from
+/// supported games. This eliminates the need for unsafe downcasting and provides a
+/// clean separation between game-specific implementations and analyzers.
 /// 
 /// # Lifecycle
 /// 
@@ -55,15 +52,15 @@ pub trait TelemetryProducer {
     
     /// Get the next telemetry data point from the game.
     /// 
-    /// Returns a boxed `Moment` trait object containing the current telemetry state.
-    /// The returned data can be converted to `SerializableTelemetry` for storage or
-    /// passed directly to analyzers for processing.
+    /// Returns a `TelemetryData` struct containing the current telemetry state in a
+    /// unified intermediate representation. The data can be passed directly to analyzers
+    /// for processing or serialized for storage.
     /// 
     /// # Errors
     /// 
     /// Returns an error if the producer is not started, if telemetry data cannot be
     /// retrieved, or if the data source is exhausted (for mock producers).
-    fn telemetry(&mut self) -> Result<Box<dyn Moment>, OcypodeError>;
+    fn telemetry(&mut self) -> Result<TelemetryData, OcypodeError>;
     
     /// Identify which racing game this producer is connected to.
     /// 
@@ -102,33 +99,13 @@ impl IRacingTelemetryProducer {
 #[cfg(windows)]
 impl TelemetryProducer for IRacingTelemetryProducer {
     fn start(&mut self) -> Result<(), OcypodeError> {
-        let start_time = SystemTime::now();
-        let mut conn_result: Result<simetry::iracing::Client, simetry::iracing::Error> = 
-            simetry::iracing::Client::connect();
+        let retry_delay = Duration::from_millis(self.retry_wait_ms);
         
-        while conn_result.is_err() {
-            if SystemTime::now()
-                .duration_since(start_time)
-                .unwrap()
-                .as_secs()
-                >= self.retry_timeout_s
-            {
-                error!(
-                    "Could not create iRacing connection after {} seconds",
-                    self.retry_timeout_s
-                );
-                return Err(OcypodeError::IRacingConnectionTimeout);
-            }
-            thread::sleep(Duration::from_millis(self.retry_wait_ms));
-            conn_result = simetry::iracing::Client::connect();
-        }
+        let client = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(simetry::iracing::Client::connect(retry_delay));
         
-        self.client = Some(conn_result.map_err(|e| {
-            error!("Failed to connect to iRacing: {:?}", e);
-            OcypodeError::TelemetryProducerError {
-                description: format!("Failed to connect to iRacing: {:?}", e),
-            }
-        })?);
+        self.client = Some(client);
         Ok(())
     }
 
@@ -142,41 +119,38 @@ impl TelemetryProducer for IRacingTelemetryProducer {
         
         let client = self.client.as_mut().expect("Missing iRacing connection");
         
-        // Get the current state from simetry
-        let state = client.sample().map_err(|e| {
-            warn!("Could not retrieve telemetry state: {:?}", e);
-            OcypodeError::TelemetryProducerError {
-                description: format!("Could not retrieve telemetry state: {:?}", e),
-            }
-        })?;
+        // In simetry 0.2.3, use next_sim_state() to get the current state
+        let state = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(client.next_sim_state())
+            .ok_or(OcypodeError::TelemetryProducerError {
+                description: "Could not retrieve iRacing state".to_string(),
+            })?;
         
-        // Extract session info from the state
-        // Note: simetry's iRacing implementation provides session data through the state
-        let track_name = state.session_info()
-            .and_then(|info| info.weekend_info.track_display_name.clone())
-            .unwrap_or_else(|| "Unknown".to_string());
-        
-        let track_config = state.session_info()
-            .and_then(|info| info.weekend_info.track_config_name.clone())
-            .unwrap_or_else(|| "".to_string());
-        
-        let track_length = state.session_info()
-            .and_then(|info| info.weekend_info.track_length.clone())
-            .unwrap_or_else(|| "0.0 km".to_string());
-        
-        // Extract iRacing-specific session IDs
+        // Extract session info from the YAML
         let session_info = state.session_info();
-        let we_series_id = session_info.and_then(|info| Some(info.weekend_info.series_id));
-        let we_session_id = session_info.and_then(|info| Some(info.weekend_info.session_id));
-        let we_season_id = session_info.and_then(|info| Some(info.weekend_info.season_id));
-        let we_sub_session_id = session_info.and_then(|info| Some(info.weekend_info.sub_session_id));
-        let we_league_id = session_info.and_then(|info| Some(info.weekend_info.league_id));
+        let track_name = session_info["WeekendInfo"]["TrackDisplayName"]
+            .as_str()
+            .unwrap_or("Unknown")
+            .to_string();
+        let track_config = session_info["WeekendInfo"]["TrackConfigName"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+        let track_length = session_info["WeekendInfo"]["TrackLength"]
+            .as_str()
+            .unwrap_or("0.0 km")
+            .to_string();
         
-        // Get max steering angle from telemetry data
-        // This is a telemetry field, not session info
-        let max_steering_angle = state.vehicle_max_steer_angle()
-            .map(|angle| angle.get::<uom::si::angle::radian>() as f32)
-            .unwrap_or(MAX_STEERING_ANGLE_DEFAULT);
+        // Extract iRacing-specific session IDs from the YAML session info
+        let we_series_id = session_info["WeekendInfo"]["SeriesID"].as_i64().map(|v| v as i32);
+        let we_session_id = session_info["WeekendInfo"]["SessionID"].as_i64().map(|v| v as i32);
+        let we_season_id = session_info["WeekendInfo"]["SeasonID"].as_i64().map(|v| v as i32);
+        let we_sub_session_id = session_info["WeekendInfo"]["SubSessionID"].as_i64().map(|v| v as i32);
+        let we_league_id = session_info["WeekendInfo"]["LeagueID"].as_i64().map(|v| v as i32);
+        
+        // Use default max steering angle (simetry 0.2.3 doesn't expose this in the Moment trait)
+        let max_steering_angle = MAX_STEERING_ANGLE_DEFAULT;
 
         Ok(SessionInfo {
             track_name,
@@ -192,7 +166,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
         })
     }
 
-    fn telemetry(&mut self) -> Result<Box<dyn Moment>, OcypodeError> {
+    fn telemetry(&mut self) -> Result<TelemetryData, OcypodeError> {
         if self.client.is_none() {
             return Err(OcypodeError::TelemetryProducerError {
                 description: "The iRacing connection is not initialized, call start() first."
@@ -202,19 +176,20 @@ impl TelemetryProducer for IRacingTelemetryProducer {
         
         let client = self.client.as_mut().ok_or(OcypodeError::MissingIRacingSession)?;
         
-        let state = client.sample().map_err(|e| {
-            error!("Could not retrieve telemetry: {:?}", e);
-            OcypodeError::TelemetryProducerError {
-                description: format!("Could not retrieve telemetry: {:?}", e),
-            }
-        })?;
-        
         if self.point_no == usize::MAX {
             self.point_no = 0;
         }
         self.point_no += 1;
         
-        Ok(Box::new(state))
+        // In simetry 0.2.3, use next_sim_state() to get the current state
+        let state = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(client.next_sim_state())
+            .ok_or(OcypodeError::TelemetryProducerError {
+                description: "Could not retrieve iRacing telemetry".to_string(),
+            })?;
+        
+        Ok(TelemetryData::from_iracing_state(&state, self.point_no))
     }
     
     fn game_source(&self) -> GameSource {
@@ -252,33 +227,13 @@ impl ACCTelemetryProducer {
 #[cfg(windows)]
 impl TelemetryProducer for ACCTelemetryProducer {
     fn start(&mut self) -> Result<(), OcypodeError> {
-        let start_time = SystemTime::now();
-        let mut conn_result: Result<simetry::assetto_corsa_competizione::Client, simetry::assetto_corsa_competizione::Error> = 
-            simetry::assetto_corsa_competizione::Client::connect();
+        let retry_delay = Duration::from_millis(self.retry_wait_ms);
         
-        while conn_result.is_err() {
-            if SystemTime::now()
-                .duration_since(start_time)
-                .unwrap()
-                .as_secs()
-                >= self.retry_timeout_s
-            {
-                error!(
-                    "Could not create ACC connection after {} seconds",
-                    self.retry_timeout_s
-                );
-                return Err(OcypodeError::ACCConnectionTimeout);
-            }
-            thread::sleep(Duration::from_millis(self.retry_wait_ms));
-            conn_result = simetry::assetto_corsa_competizione::Client::connect();
-        }
+        let client = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(simetry::assetto_corsa_competizione::Client::connect(retry_delay));
         
-        self.client = Some(conn_result.map_err(|e| {
-            error!("Failed to connect to ACC: {:?}", e);
-            OcypodeError::TelemetryProducerError {
-                description: format!("Failed to connect to ACC: {:?}", e),
-            }
-        })?);
+        self.client = Some(client);
         Ok(())
     }
 
@@ -292,30 +247,22 @@ impl TelemetryProducer for ACCTelemetryProducer {
         
         let client = self.client.as_mut().expect("Missing ACC connection");
         
-        // Get the current state from simetry
-        let state = client.sample().map_err(|e| {
-            warn!("Could not retrieve telemetry state: {:?}", e);
-            OcypodeError::TelemetryProducerError {
-                description: format!("Could not retrieve telemetry state: {:?}", e),
-            }
-        })?;
+        // In simetry 0.2.3, use next_sim_state() to get the current state
+        let _state = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(client.next_sim_state())
+            .ok_or(OcypodeError::TelemetryProducerError {
+                description: "Could not retrieve ACC state".to_string(),
+            })?;
         
-        // Extract session info from the state
-        // ACC provides track name through simetry
-        let track_name = state.session_info()
-            .and_then(|info| info.track.clone())
-            .unwrap_or_else(|| "Unknown".to_string());
-        
-        // ACC doesn't provide separate track configuration in the same way as iRacing
+        // For ACC, we need to extract track info from the static data
+        // ACC doesn't provide as much session info as iRacing
+        let track_name = "Unknown".to_string(); // ACC doesn't expose track name easily
         let track_config = String::new();
-        
-        // ACC doesn't provide track length in the same format
         let track_length = String::new();
         
-        // Get max steering angle from telemetry data
-        let max_steering_angle = state.vehicle_max_steer_angle()
-            .map(|angle| angle.get::<uom::si::angle::radian>() as f32)
-            .unwrap_or(MAX_STEERING_ANGLE_DEFAULT);
+        // Use default max steering angle (simetry 0.2.3 doesn't expose this in the Moment trait)
+        let max_steering_angle = MAX_STEERING_ANGLE_DEFAULT;
 
         // ACC doesn't have iRacing-specific session IDs, so all are None
         Ok(SessionInfo {
@@ -332,7 +279,7 @@ impl TelemetryProducer for ACCTelemetryProducer {
         })
     }
 
-    fn telemetry(&mut self) -> Result<Box<dyn Moment>, OcypodeError> {
+    fn telemetry(&mut self) -> Result<TelemetryData, OcypodeError> {
         if self.client.is_none() {
             return Err(OcypodeError::TelemetryProducerError {
                 description: "The ACC connection is not initialized, call start() first."
@@ -344,19 +291,20 @@ impl TelemetryProducer for ACCTelemetryProducer {
             description: "Missing ACC session".to_string(),
         })?;
         
-        let state = client.sample().map_err(|e| {
-            error!("Could not retrieve telemetry: {:?}", e);
-            OcypodeError::TelemetryProducerError {
-                description: format!("Could not retrieve telemetry: {:?}", e),
-            }
-        })?;
-        
         if self.point_no == usize::MAX {
             self.point_no = 0;
         }
         self.point_no += 1;
         
-        Ok(Box::new(state))
+        // In simetry 0.2.3, use next_sim_state() to get the current state
+        let state = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(client.next_sim_state())
+            .ok_or(OcypodeError::TelemetryProducerError {
+                description: "Could not retrieve ACC telemetry".to_string(),
+            })?;
+        
+        Ok(TelemetryData::from_acc_state(&state, self.point_no))
     }
     
     fn game_source(&self) -> GameSource {
@@ -370,8 +318,7 @@ impl TelemetryProducer for ACCTelemetryProducer {
 /// 
 /// MockTelemetryProducer allows the application to work with pre-recorded telemetry data
 /// or programmatically generated test data. It implements the TelemetryProducer trait
-/// using SerializableTelemetry data and returns MockMoment instances that implement
-/// the simetry Moment trait.
+/// using TelemetryData directly.
 /// 
 /// This enables:
 /// - Unit testing of telemetry processing logic without requiring a running game
@@ -379,7 +326,7 @@ impl TelemetryProducer for ACCTelemetryProducer {
 /// - Reproducible test scenarios for analyzer validation
 pub(crate) struct MockTelemetryProducer {
     cur_tick: usize,
-    points: Vec<SerializableTelemetry>,
+    points: Vec<TelemetryData>,
     pub track_name: String,
     pub max_steering_angle: f32,
     pub game_source: GameSource,
@@ -399,16 +346,16 @@ impl Default for MockTelemetryProducer {
 
 #[allow(dead_code)]
 impl MockTelemetryProducer {
-    /// Create a MockTelemetryProducer from a vector of SerializableTelemetry points.
+    /// Create a MockTelemetryProducer from a vector of TelemetryData points.
     /// 
     /// # Arguments
     /// 
-    /// * `points` - A vector of SerializableTelemetry data points to replay
+    /// * `points` - A vector of TelemetryData data points to replay
     /// 
     /// # Returns
     /// 
     /// A new MockTelemetryProducer initialized with the provided data points
-    pub fn from_points(points: Vec<SerializableTelemetry>) -> Self {
+    pub fn from_points(points: Vec<TelemetryData>) -> Self {
         // Infer game source from the first point if available
         let game_source = points.first()
             .map(|p| p.game_source)
@@ -423,14 +370,14 @@ impl MockTelemetryProducer {
         }
     }
 
-    /// Load telemetry data from a JSON file.
+    /// Load telemetry data from a JSON Lines file.
     /// 
-    /// The file should contain a JSON array of SerializableTelemetry objects,
+    /// The file should contain TelemetryOutput objects in JSON Lines format,
     /// typically created by the telemetry writer during a live session.
     /// 
     /// # Arguments
     /// 
-    /// * `file` - Path to the JSON file containing telemetry data
+    /// * `file` - Path to the JSON Lines file containing telemetry data
     /// 
     /// # Returns
     /// 
@@ -442,17 +389,42 @@ impl MockTelemetryProducer {
     /// Returns an error if:
     /// - The file cannot be opened
     /// - The file contains invalid JSON
-    /// - The JSON does not match the SerializableTelemetry format
+    /// - The JSON does not match the TelemetryOutput format
     pub fn from_file(file: &str) -> Result<Self, OcypodeError> {
+        use std::io::BufRead;
+        
         let file =
             std::fs::File::open(file).map_err(|e| OcypodeError::NoIRacingFile { source: e })?;
         let reader = std::io::BufReader::new(file);
-        let points: Vec<SerializableTelemetry> = serde_json::from_reader(reader).map_err(|e| {
-            error!("Could not load JSON file: {}", e);
-            OcypodeError::TelemetryProducerError {
-                description: format!("Could not load JSON file: {}", e),
+        
+        let mut points = Vec::new();
+        let mut track_name = "Unknown".to_string();
+        let mut max_steering_angle = 0.0;
+        
+        for line in reader.lines() {
+            let line = line.map_err(|e| OcypodeError::TelemetryProducerError {
+                description: format!("Could not read line from file: {}", e),
+            })?;
+            
+            // Parse as TelemetryOutput format
+            let output: TelemetryOutput = serde_json::from_str(&line)
+                .map_err(|e| {
+                    error!("Could not parse JSON line: {}", e);
+                    OcypodeError::TelemetryProducerError {
+                        description: format!("Could not parse JSON line: {}", e),
+                    }
+                })?;
+            
+            match output {
+                TelemetryOutput::DataPoint(telemetry) => {
+                    points.push(telemetry);
+                }
+                TelemetryOutput::SessionChange(session) => {
+                    track_name = session.track_name;
+                    max_steering_angle = session.max_steering_angle;
+                }
             }
-        })?;
+        }
 
         // Infer game source from the first point if available
         let game_source = points.first()
@@ -462,8 +434,8 @@ impl MockTelemetryProducer {
         Ok(Self {
             cur_tick: 0,
             points,
-            track_name: "Unknown".to_string(),
-            max_steering_angle: 0.,
+            track_name,
+            max_steering_angle,
             game_source,
         })
     }
@@ -490,7 +462,7 @@ impl TelemetryProducer for MockTelemetryProducer {
         })
     }
 
-    fn telemetry(&mut self) -> Result<Box<dyn Moment>, OcypodeError> {
+    fn telemetry(&mut self) -> Result<TelemetryData, OcypodeError> {
         if self.cur_tick >= self.points.len() {
             return Err(OcypodeError::TelemetryProducerError {
                 description: "End of points vec".to_string(),
@@ -500,7 +472,7 @@ impl TelemetryProducer for MockTelemetryProducer {
         let point = self.points[self.cur_tick].clone();
         self.cur_tick += 1;
         
-        Ok(Box::new(MockMoment::new(point)))
+        Ok(point)
     }
     
     fn game_source(&self) -> GameSource {

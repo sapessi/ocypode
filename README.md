@@ -102,23 +102,30 @@ When you start Ocypode in live mode:
 
 ## Migration Notes
 
-### Breaking Changes in v0.2.0
+### Breaking Changes in v0.3.0
 
-**Important:** Version 0.2.0 introduces breaking changes to the telemetry file format. Telemetry files created with older versions of Ocypode are **not compatible** with v0.2.0 and later.
+**Important:** Version 0.3.0 introduces breaking changes to the telemetry file format. Telemetry files created with older versions of Ocypode (v0.2.0 and earlier) are **not compatible** with v0.3.0 and later.
 
 #### What Changed
 
-1. **Multi-game support:** The application now supports multiple racing simulations through the simetry library
-2. **New file format:** Telemetry files now use the `SerializableTelemetry` format with a `game_source` field
-3. **Required game parameter:** You must now specify which game to connect to using `--game` parameter
-4. **Field name changes:** Several telemetry field names have been updated for consistency
+1. **Unified telemetry representation:** The application now uses a single `TelemetryData` struct throughout, replacing the previous `SerializableTelemetry` format
+2. **Explicit unit suffixes:** All field names now include explicit unit suffixes for clarity (e.g., `steering_angle_rad`, `speed_mps`, `latitude_deg`)
+3. **Improved field naming:** Field names have been updated for consistency and clarity:
+   - `steering` → `steering_angle_rad`
+   - `lap_distance` → `lap_distance_m`
+   - `abs_active` → `is_abs_active`
+   - `lat`/`lon` → `latitude_deg`/`longitude_deg`
+   - `lat_accel`/`lon_accel` → `lateral_accel_mps2`/`longitudinal_accel_mps2`
+   - All orientation fields now include `_rad` suffix
+   - All rate fields now include `_rps` suffix
+4. **Eliminated unsafe code:** The telemetry system no longer uses unsafe downcasting, improving reliability and maintainability
 
 #### Migration Path
 
-There is **no automatic migration** from the old format. To use your telemetry data with v0.2.0:
+There is **no automatic migration** from older formats. To use your telemetry data with v0.3.0:
 
 1. Re-record your telemetry sessions using the updated application
-2. Use the new CLI syntax with the `--game` parameter
+2. The new format will automatically use the updated field names with explicit units
 
 #### Loading Legacy Files
 
@@ -131,6 +138,14 @@ compatible with the current version. Please re-record your session.
 
 For detailed information about the new file format, see [TELEMETRY_FILE_FORMAT.md](TELEMETRY_FILE_FORMAT.md).
 
+For a complete migration guide with code examples, see [MIGRATION.md](MIGRATION.md).
+
+### Previous Breaking Changes
+
+#### v0.2.0
+
+Version 0.2.0 introduced multi-game support and the `SerializableTelemetry` format with a `game_source` field. Files from v0.1.0 are not compatible with v0.2.0 or later.
+
 ## Status
 The real-time view with basic telemetry and alerts is working. The offline analysis portion is lower priority for a first release. I have created [a project](https://github.com/users/sapessi/projects/1/views/1) to track the first official release.
 
@@ -140,7 +155,17 @@ Ocypode saves telemetry data in JSON Lines format (`.jsonl`). Each line contains
 - A telemetry data point with vehicle state and analyzer annotations
 - A session change event with track and session metadata
 
-The `game_source` field is always present to identify which racing simulation the data came from.
+The `TelemetryData` structure uses explicit unit suffixes in field names for clarity:
+- `_rad` for radians
+- `_rps` for radians per second
+- `_mps` for meters per second
+- `_mps2` for meters per second squared
+- `_deg` for degrees
+- `_m` for meters
+- `_s` for seconds
+- `_pct` for percentage (0.0 to 1.0)
+
+The `game_source` field is always present to identify which racing simulation the data came from. Some fields are game-specific (e.g., GPS coordinates are only available from iRacing).
 
 For complete format specification, see [TELEMETRY_FILE_FORMAT.md](TELEMETRY_FILE_FORMAT.md).
 
@@ -160,20 +185,31 @@ $ git config --local core.hooksPath .githooks/
 
 Ocypode uses the [simetry](https://github.com/adnanademovic/simetry) library as a unified telemetry abstraction layer. This allows the application to support multiple racing simulations through a common interface.
 
+The application uses an intermediate telemetry representation (`TelemetryData`) that decouples analyzers from game-specific implementations. This design:
+- Eliminates unsafe code by avoiding type downcasting
+- Provides a unified interface for all telemetry data
+- Makes it easy to add support for new racing simulations
+- Uses explicit unit suffixes in field names for clarity
+
 Key components:
-- **TelemetryProducer trait:** Abstracts telemetry data acquisition from different games
-- **TelemetryAnalyzer trait:** Processes telemetry to detect driving issues (slip, wheelspin, etc.)
+- **TelemetryProducer trait:** Abstracts telemetry data acquisition from different games, converting game-specific data to `TelemetryData`
+- **TelemetryAnalyzer trait:** Processes `TelemetryData` to detect driving issues (slip, wheelspin, etc.)
 - **TelemetryCollector:** Orchestrates data flow from producers through analyzers to UI and storage
+- **TelemetryData struct:** Unified intermediate representation capturing all possible telemetry fields from supported games
 
 ### Adding Support for New Games
 
 To add support for a new racing simulation:
 
 1. Ensure the game is supported by the simetry library
-2. Add a new variant to the `GameSource` enum
-3. Create a new producer struct implementing `TelemetryProducer`
-4. Update the CLI parameter parsing in `main.rs`
-5. Test with the new game
+2. Add a new variant to the `GameSource` enum in `src/telemetry/mod.rs`
+3. Create a conversion function (e.g., `TelemetryData::from_new_game_state()`) that extracts telemetry fields from the game's data structure
+4. Create a new producer struct implementing `TelemetryProducer` that uses the conversion function
+5. Update the CLI parameter parsing in `main.rs`
+6. Document which telemetry fields are available from the new game
+7. Test with the new game
+
+The intermediate representation design makes it straightforward to add new games - you only need to implement the conversion logic once, and all analyzers will automatically work with the new game.
 
 ### Running Tests
 

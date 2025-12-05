@@ -51,9 +51,6 @@ pub fn collect_telemetry(
         writer_sender.send(TelemetryOutput::SessionChange(last_session_info.clone()))?;
     }
 
-    let mut point_no = 0;
-    let game_source = producer.game_source();
-
     loop {
         thread::sleep(Duration::from_millis(REFRESH_RATE_MS));
 
@@ -85,33 +82,24 @@ pub fn collect_telemetry(
             last_session_info_check_time = SystemTime::now();
         }
 
-        // Get telemetry as Box<dyn Moment>
-        let moment = producer.telemetry()?;
+        // Get telemetry as TelemetryData
+        let mut telemetry_data = producer.telemetry()?;
         
-        // Run analyzers on the Moment data
+        // Run analyzers on the TelemetryData
         let mut annotations: Vec<TelemetryAnnotation> = Vec::new();
         for analyzer in analyzers.iter_mut() {
-            annotations.append(&mut analyzer.analyze(moment.as_ref(), &last_session_info));
+            annotations.append(&mut analyzer.analyze(&telemetry_data, &last_session_info));
         }
         
-        // Convert Moment to SerializableTelemetry
-        let mut serializable = super::SerializableTelemetry::from_moment(
-            moment.as_ref(),
-            point_no,
-            game_source,
-        );
-        
-        // Add annotations to the serializable telemetry
+        // Add annotations to the telemetry data
         if !annotations.is_empty() {
-            serializable.annotations = annotations;
+            telemetry_data.annotations = annotations;
         }
 
-        telemetry_sender.send(TelemetryOutput::DataPoint(serializable.clone()))?;
+        telemetry_sender.send(TelemetryOutput::DataPoint(telemetry_data.clone()))?;
         if let Some(ref writer_sender) = telemetry_writer_sender {
-            writer_sender.send(TelemetryOutput::DataPoint(serializable.clone()))?;
+            writer_sender.send(TelemetryOutput::DataPoint(telemetry_data.clone()))?;
         }
-        
-        point_no += 1;
     }
 }
 
@@ -140,7 +128,7 @@ fn wait_for_session(producer: &mut impl TelemetryProducer) -> Result<(), Ocypode
 mod tests {
     use super::*;
     use crate::telemetry::producer::MockTelemetryProducer;
-    use crate::telemetry::{TelemetryOutput, SerializableTelemetry, GameSource};
+    use crate::telemetry::{TelemetryOutput, TelemetryData, GameSource};
     use std::sync::mpsc::{self, Receiver, Sender};
     use std::thread;
 
@@ -154,7 +142,7 @@ mod tests {
             mpsc::channel();
 
         let points = vec![
-            SerializableTelemetry {
+            TelemetryData {
                 point_no: 0,
                 timestamp_ms: 0,
                 game_source: GameSource::IRacing,
@@ -167,7 +155,7 @@ mod tests {
                 clutch: Some(0.0),
                 ..Default::default()
             },
-            SerializableTelemetry {
+            TelemetryData {
                 point_no: 1,
                 timestamp_ms: 100,
                 game_source: GameSource::IRacing,
@@ -237,7 +225,7 @@ mod tests {
         ) = mpsc::channel();
 
         let points = vec![
-            SerializableTelemetry {
+            TelemetryData {
                 point_no: 0,
                 timestamp_ms: 0,
                 game_source: GameSource::IRacing,
@@ -250,7 +238,7 @@ mod tests {
                 clutch: Some(0.0),
                 ..Default::default()
             },
-            SerializableTelemetry {
+            TelemetryData {
                 point_no: 1,
                 timestamp_ms: 100,
                 game_source: GameSource::IRacing,

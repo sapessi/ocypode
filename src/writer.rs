@@ -24,15 +24,23 @@ use std::io::BufRead;
 /// Each line in the file is one of two types:
 ///
 /// ### DataPoint
-/// Contains telemetry data from a single moment in time, including:
+/// Contains telemetry data from a single moment in time using the `TelemetryData` structure.
+/// All fields use explicit unit suffixes for clarity (e.g., `_rad`, `_mps`, `_deg`).
+///
+/// Key fields include:
 /// - `point_no`: Sequential point number
 /// - `timestamp_ms`: Unix timestamp in milliseconds
 /// - `game_source`: The source game (e.g., "IRacing" or "ACC")
-/// - Vehicle state: gear, speed, RPM, etc.
-/// - Inputs: throttle, brake, clutch, steering
-/// - Position data: lap distance, lap number, lap times
-/// - Flags: pit limiter, in pit lane, ABS active
-/// - Tire data: temperature information for all four tires
+/// - Vehicle state: `gear`, `speed_mps`, `engine_rpm`, `max_engine_rpm`, `shift_point_rpm`
+/// - Inputs: `throttle`, `brake`, `clutch`, `steering_angle_rad`, `steering_pct`
+/// - Position data: `lap_distance_m`, `lap_distance_pct`, `lap_number`
+/// - Timing: `last_lap_time_s`, `best_lap_time_s`
+/// - Flags: `is_pit_limiter_engaged`, `is_in_pit_lane`, `is_abs_active`
+/// - GPS (iRacing only): `latitude_deg`, `longitude_deg`
+/// - Acceleration: `lateral_accel_mps2`, `longitudinal_accel_mps2`
+/// - Orientation: `pitch_rad`, `roll_rad`, `yaw_rad`
+/// - Rates (iRacing only): `pitch_rate_rps`, `roll_rate_rps`, `yaw_rate_rps`
+/// - Tire data: `lf_tire_info`, `rf_tire_info`, `lr_tire_info`, `rr_tire_info`
 /// - `annotations`: Array of analyzer-generated annotations (slip, wheelspin, etc.)
 ///
 /// Example:
@@ -76,7 +84,7 @@ pub fn write_telemetry(
     
     for point in &telemetry_receiver {
         // Serialize TelemetryOutput to JSON
-        // This includes SerializableTelemetry (with game_source) for DataPoint
+        // This includes TelemetryData (with game_source) for DataPoint
         // and SessionInfo (with game_source) for SessionChange
         let json_line = serde_json::to_string(&point)
             .map_err(|e| {
@@ -106,7 +114,7 @@ pub fn write_telemetry(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::telemetry::{SerializableTelemetry, SessionInfo, GameSource};
+    use crate::telemetry::{TelemetryData, SessionInfo, GameSource};
     use std::sync::mpsc;
     use std::io::BufReader;
     use tempfile::NamedTempFile;
@@ -120,8 +128,8 @@ mod tests {
         // Create a channel and send some test data
         let (tx, rx) = mpsc::channel();
 
-        // Create a SerializableTelemetry with IRacing game source
-        let mut telemetry = SerializableTelemetry::default();
+        // Create a TelemetryData with IRacing game source
+        let mut telemetry = TelemetryData::default();
         telemetry.game_source = GameSource::IRacing;
         telemetry.point_no = 42;
         telemetry.gear = Some(3);
@@ -212,7 +220,7 @@ mod tests {
 
         // Send multiple data points
         for i in 0..5 {
-            let mut telemetry = SerializableTelemetry::default();
+            let mut telemetry = TelemetryData::default();
             telemetry.game_source = GameSource::IRacing;
             telemetry.point_no = i;
             tx.send(TelemetryOutput::DataPoint(telemetry)).unwrap();

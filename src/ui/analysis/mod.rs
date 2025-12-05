@@ -10,7 +10,7 @@ use itertools::Itertools;
 
 use crate::{
     OcypodeError,
-    telemetry::{SessionInfo, TelemetryAnnotation, TelemetryOutput, SerializableTelemetry},
+    telemetry::{SessionInfo, TelemetryAnnotation, TelemetryOutput, TelemetryData},
     ui::live::{PALETTE_BLACK, PALETTE_BROWN, PALETTE_MAROON, PALETTE_ORANGE},
 };
 
@@ -23,7 +23,7 @@ struct TelemetryFile {
 
 #[derive(Default, Clone, Debug)]
 struct Lap {
-    telemetry: Vec<SerializableTelemetry>,
+    telemetry: Vec<TelemetryData>,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -394,7 +394,7 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                             if trailbrake_steering_alert.show(ui, Align::Center).clicked() {
                                                 if let Some(TelemetryAnnotation::TrailbrakeSteering { cur_trailbrake_steering, .. }) =
                                                     telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::TrailbrakeSteering { .. })) {
-                                                        let steering = telemetry.steering.unwrap_or(0.0);
+                                                        let steering = telemetry.steering_angle_rad.unwrap_or(0.0);
                                                         self.selected_annotation_content = format!(
                                                             "Steering: {:.2}%\nSteering angle (rad): {}",
                                                             cur_trailbrake_steering,
@@ -406,7 +406,7 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                             if slip_alert.show(ui, Align::Center).clicked() {
                                                 if let Some(TelemetryAnnotation::Scrub { avg_yaw_rate_change, cur_yaw_rate_change, .. }) =
                                                     telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::Scrub { .. })) {
-                                                        let steering = telemetry.steering.unwrap_or(0.0);
+                                                        let steering = telemetry.steering_angle_rad.unwrap_or(0.0);
                                                         let speed = telemetry.speed_mps.unwrap_or(0.0);
                                                         self.selected_annotation_content = format!(
                                                             "Yaw change: {:.2}\nAvg yaw change: {:.2}\nSteering (rad): {:.2}\nSpeed: {:.2}",
@@ -419,7 +419,7 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                                 if let Some(TelemetryAnnotation::Slip { prev_speed, cur_speed, .. }) =
                                                     telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::Slip { .. })) {
                                                         let throttle = telemetry.throttle.unwrap_or(0.0);
-                                                        let steering = telemetry.steering.unwrap_or(0.0);
+                                                        let steering = telemetry.steering_angle_rad.unwrap_or(0.0);
                                                         self.selected_annotation_content = format!(
                                                             "Speed: {:.2}\nPrev speed: {:.2}\nThrottle %: {:.2}%\nSteering (rad): {:.2}%",
                                                             cur_speed,
