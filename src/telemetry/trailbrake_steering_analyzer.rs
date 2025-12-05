@@ -24,12 +24,12 @@ impl TelemetryAnalyzer for TrailbrakeSteeringAnalyzer {
         session_info: &SessionInfo,
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
-        
+
         // Extract brake and steering data from TelemetryData
         let brake = telemetry.brake.unwrap_or(0.0);
         let steering_angle_rad = telemetry.steering_angle_rad.unwrap_or(0.0);
         let steering_pct = telemetry.steering_pct.unwrap_or(0.0);
-        
+
         // nothing to process here if we cannot establish the current steering pct
         if session_info.max_steering_angle == 0. {
             return output;
@@ -40,8 +40,7 @@ impl TelemetryAnalyzer for TrailbrakeSteeringAnalyzer {
         }
 
         // we are braking... measure steering angle
-        if brake > self.min_trailbraking_pct
-            && steering_pct > self.max_trailbraking_steering_angle
+        if brake > self.min_trailbraking_pct && steering_pct > self.max_trailbraking_steering_angle
         {
             output.push(super::TelemetryAnnotation::TrailbrakeSteering {
                 cur_trailbrake_steering: steering_pct,
@@ -54,7 +53,7 @@ impl TelemetryAnalyzer for TrailbrakeSteeringAnalyzer {
 
 #[cfg(test)]
 mod tests {
-    use crate::telemetry::{TelemetryData, GameSource};
+    use crate::telemetry::{GameSource, TelemetryData};
 
     use super::*;
 
@@ -83,7 +82,7 @@ mod tests {
         };
         assert!(analyzer.analyze(&telemetry_data, &session_info).is_empty());
     }
-    
+
     fn create_default_telemetry() -> TelemetryData {
         TelemetryData {
             point_no: 0,

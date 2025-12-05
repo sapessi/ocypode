@@ -8,7 +8,7 @@ use config::AppConfig;
 use egui::{Color32, ViewportBuilder, ViewportId, Visuals, style::Widgets};
 use log::error;
 
-use crate::telemetry::{TelemetryOutput, TelemetryData};
+use crate::telemetry::{TelemetryData, TelemetryOutput};
 
 use super::ScrubSlipAlert;
 

@@ -81,17 +81,16 @@ pub fn write_telemetry(
 ) -> Result<(), OcypodeError> {
     let telemetry_file = File::create(file).map_err(|e| OcypodeError::WriterError { source: e })?;
     let mut telemetry_file_writer = BufWriter::new(telemetry_file);
-    
+
     for point in &telemetry_receiver {
         // Serialize TelemetryOutput to JSON
         // This includes TelemetryData (with game_source) for DataPoint
         // and SessionInfo (with game_source) for SessionChange
-        let json_line = serde_json::to_string(&point)
-            .map_err(|e| {
-                warn!("Error serializing telemetry point: {}", e);
-                e
-            });
-        
+        let json_line = serde_json::to_string(&point).map_err(|e| {
+            warn!("Error serializing telemetry point: {}", e);
+            e
+        });
+
         match json_line {
             Ok(json) => {
                 if let Err(e) = writeln!(telemetry_file_writer, "{}", json) {
@@ -103,20 +102,19 @@ pub fn write_telemetry(
             }
         }
     }
-    
+
     telemetry_file_writer
         .flush()
         .map_err(|e| OcypodeError::WriterError { source: e })?;
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::telemetry::{TelemetryData, SessionInfo, GameSource};
-    use std::sync::mpsc;
+    use crate::telemetry::{GameSource, SessionInfo, TelemetryData};
     use std::io::BufReader;
+    use std::sync::mpsc;
     use tempfile::NamedTempFile;
 
     #[test]
@@ -136,7 +134,8 @@ mod tests {
         telemetry.speed_mps = Some(45.5);
 
         // Send the data point
-        tx.send(TelemetryOutput::DataPoint(telemetry.clone())).unwrap();
+        tx.send(TelemetryOutput::DataPoint(telemetry.clone()))
+            .unwrap();
         drop(tx); // Close the channel so write_telemetry can finish
 
         // Write telemetry to file
@@ -148,13 +147,13 @@ mod tests {
         let lines: Vec<String> = reader.lines().map(|l| l.unwrap()).collect();
 
         assert_eq!(lines.len(), 1);
-        
+
         // Parse the JSON and verify game_source is present
         let json_value: serde_json::Value = serde_json::from_str(&lines[0]).unwrap();
-        
+
         // Check that it's a DataPoint variant
         assert!(json_value.get("DataPoint").is_some());
-        
+
         // Check that game_source is present and correct
         let data_point = json_value.get("DataPoint").unwrap();
         assert_eq!(data_point.get("game_source").unwrap(), "IRacing");
@@ -178,7 +177,8 @@ mod tests {
         session_info.track_configuration = "Full Course".to_string();
 
         // Send the session change
-        tx.send(TelemetryOutput::SessionChange(session_info)).unwrap();
+        tx.send(TelemetryOutput::SessionChange(session_info))
+            .unwrap();
         drop(tx); // Close the channel so write_telemetry can finish
 
         // Write telemetry to file
@@ -190,13 +190,13 @@ mod tests {
         let lines: Vec<String> = reader.lines().map(|l| l.unwrap()).collect();
 
         assert_eq!(lines.len(), 1);
-        
+
         // Parse the JSON and verify game_source is present
         let json_value: serde_json::Value = serde_json::from_str(&lines[0]).unwrap();
-        
+
         // Check that it's a SessionChange variant
         assert!(json_value.get("SessionChange").is_some());
-        
+
         // Check that game_source is present and correct
         let session_change = json_value.get("SessionChange").unwrap();
         assert_eq!(session_change.get("game_source").unwrap(), "ACC");
@@ -216,7 +216,8 @@ mod tests {
         let mut session_info = SessionInfo::default();
         session_info.game_source = GameSource::IRacing;
         session_info.track_name = "Laguna Seca".to_string();
-        tx.send(TelemetryOutput::SessionChange(session_info)).unwrap();
+        tx.send(TelemetryOutput::SessionChange(session_info))
+            .unwrap();
 
         // Send multiple data points
         for i in 0..5 {

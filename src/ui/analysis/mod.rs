@@ -10,7 +10,7 @@ use itertools::Itertools;
 
 use crate::{
     OcypodeError,
-    telemetry::{SessionInfo, TelemetryAnnotation, TelemetryOutput, TelemetryData},
+    telemetry::{SessionInfo, TelemetryAnnotation, TelemetryData, TelemetryOutput},
     ui::live::{PALETTE_BLACK, PALETTE_BROWN, PALETTE_MAROON, PALETTE_ORANGE},
 };
 
@@ -478,26 +478,26 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
 fn is_legacy_format(source_file: &PathBuf) -> bool {
     use std::fs::File;
     use std::io::{BufRead, BufReader};
-    
+
     // Try to read the first line of the file
     let file = match File::open(source_file) {
         Ok(f) => f,
         Err(_) => return false,
     };
-    
+
     let mut reader = BufReader::new(file);
     let mut first_line = String::new();
-    
+
     if reader.read_line(&mut first_line).is_err() {
         return false;
     }
-    
+
     // Try to parse as JSON
     let json_value: serde_json::Value = match serde_json::from_str(&first_line) {
         Ok(v) => v,
         Err(_) => return false,
     };
-    
+
     // Check if it's a DataPoint variant
     if let Some(obj) = json_value.get("DataPoint") {
         // Legacy format has fields like "cur_gear", "cur_rpm", "cur_speed", "lap_dist"
@@ -507,13 +507,13 @@ fn is_legacy_format(source_file: &PathBuf) -> bool {
             || obj.get("cur_speed").is_some()
             || obj.get("lap_dist").is_some()
             || obj.get("car_shift_ideal_rpm").is_some();
-        
+
         let has_new_fields = obj.get("game_source").is_some();
-        
+
         // If it has legacy fields and doesn't have new fields, it's legacy format
         return has_legacy_fields && !has_new_fields;
     }
-    
+
     false
 }
 
@@ -578,7 +578,7 @@ fn load_telemetry_jsonl(source_file: &PathBuf) -> Result<TelemetryFile, OcypodeE
     if is_legacy_format(source_file) {
         return Err(OcypodeError::LegacyTelemetryFormat);
     }
-    
+
     // TODO: Should probably load in a non-blocking way here
     let telemetry_lines = serde_jsonlines::json_lines(source_file)
         .map_err(|e| OcypodeError::TelemetryLoaderError { source: e })?

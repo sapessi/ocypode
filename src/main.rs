@@ -12,9 +12,9 @@ use std::{
 use clap::{Parser, Subcommand, ValueEnum, arg};
 use egui::Vec2;
 use snafu::Snafu;
-use telemetry::{TelemetryOutput};
+use telemetry::TelemetryOutput;
 #[cfg(windows)]
-use telemetry::producer::{IRacingTelemetryProducer, ACCTelemetryProducer};
+use telemetry::producer::{ACCTelemetryProducer, IRacingTelemetryProducer};
 use ui::analysis::TelemetryAnalysisApp;
 use ui::live::{HISTORY_SECONDS, LiveTelemetryApp, config::AppConfig};
 
@@ -65,7 +65,9 @@ enum OcypodeError {
     InvalidTelemetryFile { path: String },
     #[snafu(display("Error loading telemetry file"))]
     TelemetryLoaderError { source: io::Error },
-    #[snafu(display("Legacy telemetry file format detected. This file was created with an older version of Ocypode and is not compatible with the current version. Please re-record your session with the current version."))]
+    #[snafu(display(
+        "Legacy telemetry file format detected. This file was created with an older version of Ocypode and is not compatible with the current version. Please re-record your session with the current version."
+    ))]
     LegacyTelemetryFormat,
 }
 
@@ -122,7 +124,7 @@ fn live(window_size: usize, output: Option<PathBuf>, game: GameSource) -> Result
         if let Some(output_file) = output {
             let (telemetry_writer_tx, telemetry_writer_rx) =
                 mpsc::channel::<telemetry::TelemetryOutput>();
-            
+
             thread::spawn(move || {
                 // Instantiate the correct producer based on the game parameter
                 match game {
@@ -193,7 +195,7 @@ fn live(window_size: usize, output: Option<PathBuf>, game: GameSource) -> Result
         )
         .expect("could not start app");
     }
-    
+
     Ok(())
 }
 
@@ -226,8 +228,10 @@ fn main() {
         Commands::Load { input } => {
             load(input).expect("Error while analyzing telemetry file");
         }
-        Commands::Live { window, output, game } => {
-            live(*window, output.clone(), *game).expect("Error while running live telemetry")
-        }
+        Commands::Live {
+            window,
+            output,
+            game,
+        } => live(*window, output.clone(), *game).expect("Error while running live telemetry"),
     };
 }

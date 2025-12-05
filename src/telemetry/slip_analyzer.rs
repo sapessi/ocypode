@@ -48,7 +48,7 @@ impl TelemetryAnalyzer for SlipAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::telemetry::{SessionInfo, TelemetryAnnotation, TelemetryData, GameSource};
+    use crate::telemetry::{GameSource, SessionInfo, TelemetryAnnotation, TelemetryData};
 
     #[test]
     fn test_slip_annotation_inserted() {
@@ -70,7 +70,11 @@ mod tests {
         // Should produce slip annotation: brake=0, throttle increasing, steering > deadzone, speed decreasing
         assert_eq!(output.len(), 1);
         match &output[0] {
-            TelemetryAnnotation::Slip { prev_speed, cur_speed, is_slip } => {
+            TelemetryAnnotation::Slip {
+                prev_speed,
+                cur_speed,
+                is_slip,
+            } => {
                 assert_eq!(*prev_speed, 55.0);
                 assert_eq!(*cur_speed, 50.0);
                 assert!(is_slip);
@@ -138,7 +142,7 @@ mod tests {
         let output = analyzer.analyze(&telemetry_data, &session_info);
         assert!(output.is_empty());
     }
-    
+
     fn create_default_telemetry() -> TelemetryData {
         TelemetryData {
             point_no: 0,

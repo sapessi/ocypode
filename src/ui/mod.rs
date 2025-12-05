@@ -56,10 +56,8 @@ impl<'i> DefaultAlert<'i> {
             let mut shift_image = egui::include_image!("../../assets/shift-grey.png");
             let cur_rpm = telemetry.engine_rpm.unwrap_or(0.0);
             let shift_rpm = telemetry.shift_point_rpm.unwrap_or(0.0);
-            
-            if cur_rpm > shift_rpm - 100.
-                && cur_rpm < shift_rpm + 100.
-            {
+
+            if cur_rpm > shift_rpm - 100. && cur_rpm < shift_rpm + 100. {
                 shift_image = egui::include_image!("../../assets/shift-green.png");
             }
             if cur_rpm > shift_rpm + 100. {

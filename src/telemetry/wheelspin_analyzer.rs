@@ -29,13 +29,13 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for WheelspinAnalyzer<WINDOW_SI
     fn analyze(&mut self, telemetry: &TelemetryData, _: &SessionInfo) -> Vec<TelemetryAnnotation> {
         // process expected RPM growth by gear
         let mut output = Vec::new();
-        
+
         // Extract data from TelemetryData
         let cur_gear = telemetry.gear.unwrap_or(0).max(0) as u32;
         let cur_rpm = telemetry.engine_rpm.unwrap_or(0.0);
         let throttle = telemetry.throttle.unwrap_or(0.0);
         let brake = telemetry.brake.unwrap_or(0.0);
-        
+
         if cur_gear != self.prev_gear {
             self.prev_gear = cur_gear;
         } else {
@@ -62,9 +62,7 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for WheelspinAnalyzer<WINDOW_SI
                         .add_sample(rpm_growth);
 
                     if *self.cur_gear_points.entry(cur_gear).or_insert(0) < WINDOW_SIZE {
-                        self.cur_gear_points
-                            .entry(cur_gear)
-                            .and_modify(|e| *e += 1);
+                        self.cur_gear_points.entry(cur_gear).and_modify(|e| *e += 1);
                     } else {
                         *self.cur_averages.entry(cur_gear).or_insert(0.) = *self
                             .telemetry_window

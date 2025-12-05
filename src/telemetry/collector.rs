@@ -66,7 +66,7 @@ pub fn collect_telemetry(
                 let session_changed = session_info.we_session_id != last_session_info.we_session_id
                     || session_info.we_sub_session_id != last_session_info.we_sub_session_id
                     || session_info.track_name != last_session_info.track_name;
-                
+
                 if session_changed {
                     last_session_info = session_info.clone();
                     telemetry_sender.send(TelemetryOutput::SessionChange(session_info.clone()))?;
@@ -84,13 +84,13 @@ pub fn collect_telemetry(
 
         // Get telemetry as TelemetryData
         let mut telemetry_data = producer.telemetry()?;
-        
+
         // Run analyzers on the TelemetryData
         let mut annotations: Vec<TelemetryAnnotation> = Vec::new();
         for analyzer in analyzers.iter_mut() {
             annotations.append(&mut analyzer.analyze(&telemetry_data, &last_session_info));
         }
-        
+
         // Add annotations to the telemetry data
         if !annotations.is_empty() {
             telemetry_data.annotations = annotations;
@@ -128,7 +128,7 @@ fn wait_for_session(producer: &mut impl TelemetryProducer) -> Result<(), Ocypode
 mod tests {
     use super::*;
     use crate::telemetry::producer::MockTelemetryProducer;
-    use crate::telemetry::{TelemetryOutput, TelemetryData, GameSource};
+    use crate::telemetry::{GameSource, TelemetryData, TelemetryOutput};
     use std::sync::mpsc::{self, Receiver, Sender};
     use std::thread;
 

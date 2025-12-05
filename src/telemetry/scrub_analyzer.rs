@@ -28,12 +28,12 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for ScrubAnalyzer<WINDOW_SIZE> 
         _session_info: &super::SessionInfo,
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
-        
+
         // Extract data from TelemetryData
         let brake = telemetry.brake.unwrap_or(0.0);
         let throttle = telemetry.throttle.unwrap_or(0.0);
         let steering_pct = telemetry.steering_pct.unwrap_or(0.0);
-        
+
         // Access yaw_rate_rps from TelemetryData, handle None gracefully
         let yaw_rate = match telemetry.yaw_rate_rps {
             Some(rate) => rate,
@@ -43,11 +43,10 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for ScrubAnalyzer<WINDOW_SIZE> 
                 return output;
             }
         };
-        
+
         let yaw_rate_change = steering_pct.abs() - yaw_rate.abs();
         if steering_pct > MIN_STEERING_PCT_MEASURE
-            && (brake >= MIN_BRAKE_PCT_MEASURE
-                || throttle <= MAX_THROTTLE_PCT_MEASURE)
+            && (brake >= MIN_BRAKE_PCT_MEASURE || throttle <= MAX_THROTTLE_PCT_MEASURE)
         {
             // calculate relationship between two points
             self.steering_to_yaw_average.add_sample(yaw_rate_change);

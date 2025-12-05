@@ -112,43 +112,43 @@ pub struct TelemetryData {
     pub point_no: usize,
     pub timestamp_ms: u128,
     pub game_source: GameSource,
-    
+
     // Vehicle state
     pub gear: Option<i8>,
     pub speed_mps: Option<f32>,
     pub engine_rpm: Option<f32>,
     pub max_engine_rpm: Option<f32>,
     pub shift_point_rpm: Option<f32>,
-    
+
     // Inputs
     pub throttle: Option<f32>,
     pub brake: Option<f32>,
     pub clutch: Option<f32>,
     pub steering_angle_rad: Option<f32>,
     pub steering_pct: Option<f32>,
-    
+
     // Position and lap data
     pub lap_distance_m: Option<f32>,
     pub lap_distance_pct: Option<f32>,
     pub lap_number: Option<u32>,
-    
+
     // Timing
     pub last_lap_time_s: Option<f32>,
     pub best_lap_time_s: Option<f32>,
-    
+
     // Flags and states
     pub is_pit_limiter_engaged: Option<bool>,
     pub is_in_pit_lane: Option<bool>,
     pub is_abs_active: Option<bool>,
-    
+
     // GPS coordinates (iRacing only)
     pub latitude_deg: Option<f32>,
     pub longitude_deg: Option<f32>,
-    
+
     // Acceleration
     pub lateral_accel_mps2: Option<f32>,
     pub longitudinal_accel_mps2: Option<f32>,
-    
+
     // Orientation
     pub pitch_rad: Option<f32>,
     pub pitch_rate_rps: Option<f32>,
@@ -156,13 +156,13 @@ pub struct TelemetryData {
     pub roll_rate_rps: Option<f32>,
     pub yaw_rad: Option<f32>,
     pub yaw_rate_rps: Option<f32>,
-    
+
     // Tire data
     pub lf_tire_info: Option<TireInfo>,
     pub rf_tire_info: Option<TireInfo>,
     pub lr_tire_info: Option<TireInfo>,
     pub rr_tire_info: Option<TireInfo>,
-    
+
     // Analyzer annotations
     pub annotations: Vec<TelemetryAnnotation>,
 }
@@ -215,17 +215,17 @@ impl Default for TelemetryData {
 
 impl TelemetryData {
     /// Convert iRacing SimState to TelemetryData.
-    /// 
+    ///
     /// Extracts all available telemetry fields from iRacing. Currently, simetry 0.2.3
     /// only exposes fields through the base Moment trait. iRacing-specific fields like
     /// steering angle, GPS coordinates, orientation, and tire temperatures are not
     /// accessible through the current simetry API.
-    /// 
+    ///
     /// Fields extracted from Moment trait:
     /// - Vehicle state (gear, speed, RPM, shift point)
     /// - Inputs (throttle, brake, clutch)
     /// - Flags (pit limiter, pit lane)
-    /// 
+    ///
     /// Fields not available (set to None):
     /// - Steering angle and percentage
     /// - Lap distance and position data
@@ -235,42 +235,47 @@ impl TelemetryData {
     /// - Acceleration data
     /// - Orientation (pitch, roll, yaw) and rates
     /// - Tire temperatures
-    /// 
+    ///
     /// TODO: These fields require either:
     /// 1. Accessing iRacing's raw shared memory directly
     /// 2. Extending the simetry library to expose these fields
     /// 3. Using a different approach to access the telemetry data
     #[cfg(windows)]
-    pub fn from_iracing_state(
-        state: &simetry::iracing::SimState,
-        point_no: usize,
-    ) -> Self {
+    pub fn from_iracing_state(state: &simetry::iracing::SimState, point_no: usize) -> Self {
         use std::time::{SystemTime, UNIX_EPOCH};
         use uom::si::angular_velocity::revolution_per_minute;
         use uom::si::velocity::meter_per_second;
-        
+
         let timestamp_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis();
-        
+
         // Extract base fields from Moment trait
         let gear = state.vehicle_gear();
-        let speed_mps = state.vehicle_velocity().map(|v| v.get::<meter_per_second>() as f32);
-        let engine_rpm = state.vehicle_engine_rotation_speed().map(|rpm| rpm.get::<revolution_per_minute>() as f32);
-        let max_engine_rpm = state.vehicle_max_engine_rotation_speed().map(|rpm| rpm.get::<revolution_per_minute>() as f32);
-        let shift_point_rpm = state.shift_point().map(|rpm| rpm.get::<revolution_per_minute>() as f32);
-        
+        let speed_mps = state
+            .vehicle_velocity()
+            .map(|v| v.get::<meter_per_second>() as f32);
+        let engine_rpm = state
+            .vehicle_engine_rotation_speed()
+            .map(|rpm| rpm.get::<revolution_per_minute>() as f32);
+        let max_engine_rpm = state
+            .vehicle_max_engine_rotation_speed()
+            .map(|rpm| rpm.get::<revolution_per_minute>() as f32);
+        let shift_point_rpm = state
+            .shift_point()
+            .map(|rpm| rpm.get::<revolution_per_minute>() as f32);
+
         // Extract pedal inputs from Moment trait
         let pedals = state.pedals();
         let throttle = pedals.as_ref().map(|p| p.throttle as f32);
         let brake = pedals.as_ref().map(|p| p.brake as f32);
         let clutch = pedals.as_ref().map(|p| p.clutch as f32);
-        
+
         // Extract flags from Moment trait
         let is_pit_limiter_engaged = state.is_pit_limiter_engaged();
         let is_in_pit_lane = state.is_vehicle_in_pit_lane();
-        
+
         // iRacing-specific fields are not accessible through simetry 0.2.3
         // These would require direct access to iRacing's shared memory
         let steering_angle_rad = None;
@@ -295,7 +300,7 @@ impl TelemetryData {
         let rf_tire_info = None;
         let lr_tire_info = None;
         let rr_tire_info = None;
-        
+
         Self {
             point_no,
             timestamp_ms,
@@ -335,27 +340,27 @@ impl TelemetryData {
             annotations: Vec::new(),
         }
     }
-    
+
     /// Convert ACC SimState to TelemetryData.
-    /// 
+    ///
     /// Extracts all available telemetry fields from ACC. ACC provides access to most
     /// telemetry data through the physics and graphics structures.
-    /// 
+    ///
     /// Fields extracted from Moment trait:
     /// - Vehicle state (gear, speed, RPM, shift point)
     /// - Flags (pit limiter, pit lane)
-    /// 
+    ///
     /// Fields extracted from ACC physics:
     /// - Inputs (throttle, brake, clutch, steering angle)
     /// - Orientation (pitch, roll, yaw)
     /// - ABS status
     /// - Tire temperatures (core temperature and contact point temperatures)
-    /// 
+    ///
     /// Fields extracted from ACC graphics:
     /// - Lap distance percentage
     /// - Lap number
     /// - Lap times
-    /// 
+    ///
     /// Fields not available in ACC (set to None):
     /// - GPS coordinates (latitude_deg, longitude_deg)
     /// - Absolute lap distance (lap_distance_m)
@@ -369,19 +374,27 @@ impl TelemetryData {
         use std::time::{SystemTime, UNIX_EPOCH};
         use uom::si::angular_velocity::revolution_per_minute;
         use uom::si::velocity::meter_per_second;
-        
+
         let timestamp_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis();
-        
+
         // Extract base fields from Moment trait
         let gear = state.vehicle_gear();
-        let speed_mps = state.vehicle_velocity().map(|v| v.get::<meter_per_second>() as f32);
-        let engine_rpm = state.vehicle_engine_rotation_speed().map(|rpm| rpm.get::<revolution_per_minute>() as f32);
-        let max_engine_rpm = state.vehicle_max_engine_rotation_speed().map(|rpm| rpm.get::<revolution_per_minute>() as f32);
-        let shift_point_rpm = state.shift_point().map(|rpm| rpm.get::<revolution_per_minute>() as f32);
-        
+        let speed_mps = state
+            .vehicle_velocity()
+            .map(|v| v.get::<meter_per_second>() as f32);
+        let engine_rpm = state
+            .vehicle_engine_rotation_speed()
+            .map(|rpm| rpm.get::<revolution_per_minute>() as f32);
+        let max_engine_rpm = state
+            .vehicle_max_engine_rotation_speed()
+            .map(|rpm| rpm.get::<revolution_per_minute>() as f32);
+        let shift_point_rpm = state
+            .shift_point()
+            .map(|rpm| rpm.get::<revolution_per_minute>() as f32);
+
         // Extract inputs directly from ACC physics data
         // ACC provides these directly rather than through the Moment trait's pedals() method
         let throttle = Some(state.physics.gas);
@@ -389,16 +402,16 @@ impl TelemetryData {
         let clutch = Some(state.physics.clutch);
         let steering_angle_rad = Some(state.physics.steer_angle);
         let steering_pct = Some(state.physics.steer_angle); // ACC uses normalized steering (-1.0 to 1.0)
-        
+
         // Extract flags from Moment trait
         let is_pit_limiter_engaged = state.is_pit_limiter_engaged();
         let is_in_pit_lane = state.is_vehicle_in_pit_lane();
-        
+
         // Extract position and lap data from ACC graphics
         let lap_distance_m = None; // ACC doesn't provide absolute lap distance
         let lap_distance_pct = Some(state.graphics.normalized_car_position);
         let lap_number = Some(state.graphics.completed_laps as u32);
-        
+
         // Extract lap times from ACC graphics
         let last_lap_time_s = {
             let ms = state.graphics.lap_timing.last.millis;
@@ -416,28 +429,28 @@ impl TelemetryData {
                 None
             }
         };
-        
+
         // Extract ABS status from ACC physics
         let is_abs_active = Some(state.physics.abs > 0.0);
-        
+
         // GPS coordinates not available in ACC
         let latitude_deg = None;
         let longitude_deg = None;
-        
+
         // Acceleration data not available in ACC
         let lateral_accel_mps2 = None;
         let longitudinal_accel_mps2 = None;
-        
+
         // Extract orientation from ACC physics
         let pitch_rad = Some(state.physics.pitch);
         let roll_rad = Some(state.physics.roll);
         let yaw_rad = Some(state.physics.heading);
-        
+
         // Rate data not available in ACC
         let pitch_rate_rps = None;
         let roll_rate_rps = None;
         let yaw_rate_rps = None;
-        
+
         // Extract tire data from ACC physics WheelInfo
         // ACC provides tire temperatures through the wheels struct
         // According to simetry docs, WheelInfo has:
@@ -452,7 +465,7 @@ impl TelemetryData {
             middle_surface_temp: state.physics.wheels.front_left.tyre_contact_point.y,
             right_surface_temp: state.physics.wheels.front_left.tyre_contact_point.z,
         });
-        
+
         let rf_tire_info = Some(TireInfo {
             left_carcass_temp: state.physics.wheels.front_right.tyre_core_temperature,
             middle_carcass_temp: state.physics.wheels.front_right.tyre_core_temperature,
@@ -461,7 +474,7 @@ impl TelemetryData {
             middle_surface_temp: state.physics.wheels.front_right.tyre_contact_point.y,
             right_surface_temp: state.physics.wheels.front_right.tyre_contact_point.z,
         });
-        
+
         let lr_tire_info = Some(TireInfo {
             left_carcass_temp: state.physics.wheels.rear_left.tyre_core_temperature,
             middle_carcass_temp: state.physics.wheels.rear_left.tyre_core_temperature,
@@ -470,7 +483,7 @@ impl TelemetryData {
             middle_surface_temp: state.physics.wheels.rear_left.tyre_contact_point.y,
             right_surface_temp: state.physics.wheels.rear_left.tyre_contact_point.z,
         });
-        
+
         let rr_tire_info = Some(TireInfo {
             left_carcass_temp: state.physics.wheels.rear_right.tyre_core_temperature,
             middle_carcass_temp: state.physics.wheels.rear_right.tyre_core_temperature,
@@ -479,7 +492,7 @@ impl TelemetryData {
             middle_surface_temp: state.physics.wheels.rear_right.tyre_contact_point.y,
             right_surface_temp: state.physics.wheels.rear_right.tyre_contact_point.z,
         });
-        
+
         Self {
             point_no,
             timestamp_ms,
@@ -519,11 +532,7 @@ impl TelemetryData {
             annotations: Vec::new(),
         }
     }
-    
-
 }
-
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum TelemetryOutput {
@@ -697,7 +706,6 @@ pub trait TelemetryAnalyzer {
 }
 
 #[cfg(test)]
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -758,14 +766,14 @@ mod tests {
 
         // Serialize to JSON
         let json = serde_json::to_string(&telemetry).expect("Failed to serialize TelemetryData");
-        
+
         // Verify JSON is not empty
         assert!(!json.is_empty());
-        
+
         // Deserialize back
-        let deserialized: TelemetryData = serde_json::from_str(&json)
-            .expect("Failed to deserialize TelemetryData");
-        
+        let deserialized: TelemetryData =
+            serde_json::from_str(&json).expect("Failed to deserialize TelemetryData");
+
         // Verify all fields match
         assert_eq!(deserialized.point_no, telemetry.point_no);
         assert_eq!(deserialized.timestamp_ms, telemetry.timestamp_ms);
@@ -775,7 +783,10 @@ mod tests {
         assert_eq!(deserialized.engine_rpm, telemetry.engine_rpm);
         assert_eq!(deserialized.throttle, telemetry.throttle);
         assert_eq!(deserialized.brake, telemetry.brake);
-        assert_eq!(deserialized.steering_angle_rad, telemetry.steering_angle_rad);
+        assert_eq!(
+            deserialized.steering_angle_rad,
+            telemetry.steering_angle_rad
+        );
         assert_eq!(deserialized.lap_distance_m, telemetry.lap_distance_m);
         assert_eq!(deserialized.latitude_deg, telemetry.latitude_deg);
         assert_eq!(deserialized.longitude_deg, telemetry.longitude_deg);
@@ -826,14 +837,14 @@ mod tests {
 
         // Serialize to JSON
         let json = serde_json::to_string(&telemetry).expect("Failed to serialize TelemetryData");
-        
+
         // Verify JSON contains null for None fields
         assert!(json.contains("null"));
-        
+
         // Deserialize back
-        let deserialized: TelemetryData = serde_json::from_str(&json)
-            .expect("Failed to deserialize TelemetryData");
-        
+        let deserialized: TelemetryData =
+            serde_json::from_str(&json).expect("Failed to deserialize TelemetryData");
+
         // Verify None fields are preserved
         assert_eq!(deserialized.engine_rpm, None);
         assert_eq!(deserialized.throttle, None);
@@ -841,7 +852,7 @@ mod tests {
         assert_eq!(deserialized.latitude_deg, None);
         assert_eq!(deserialized.yaw_rate_rps, None);
         assert_eq!(deserialized.lf_tire_info, None);
-        
+
         // Verify Some fields are preserved
         assert_eq!(deserialized.gear, Some(2));
         assert_eq!(deserialized.speed_mps, Some(30.0));
@@ -861,9 +872,9 @@ mod tests {
         };
 
         // Serialize to pretty JSON for inspection
-        let json = serde_json::to_string_pretty(&telemetry)
-            .expect("Failed to serialize TelemetryData");
-        
+        let json =
+            serde_json::to_string_pretty(&telemetry).expect("Failed to serialize TelemetryData");
+
         // Verify JSON contains expected fields
         assert!(json.contains("\"point_no\""));
         assert!(json.contains("\"timestamp_ms\""));
@@ -871,10 +882,10 @@ mod tests {
         assert!(json.contains("\"gear\""));
         assert!(json.contains("\"speed_mps\""));
         assert!(json.contains("\"engine_rpm\""));
-        
+
         // Verify JSON format is valid by deserializing
-        let _: TelemetryData = serde_json::from_str(&json)
-            .expect("Failed to deserialize pretty JSON");
+        let _: TelemetryData =
+            serde_json::from_str(&json).expect("Failed to deserialize pretty JSON");
     }
 
     #[test]
@@ -922,17 +933,17 @@ mod tests {
         // Deserialize
         let telemetry: TelemetryData = serde_json::from_str(json)
             .expect("Failed to deserialize TelemetryData with missing fields");
-        
+
         // Verify required fields
         assert_eq!(telemetry.point_no, 5);
         assert_eq!(telemetry.timestamp_ms, 2000);
         assert_eq!(telemetry.game_source, GameSource::ACC);
-        
+
         // Verify optional fields are None
         assert_eq!(telemetry.engine_rpm, None);
         assert_eq!(telemetry.throttle, None);
         assert_eq!(telemetry.latitude_deg, None);
-        
+
         // Verify Some fields
         assert_eq!(telemetry.gear, Some(3));
         assert_eq!(telemetry.speed_mps, Some(40.0));
@@ -951,18 +962,30 @@ mod tests {
 
         // Serialize
         let json = serde_json::to_string(&tire_info).expect("Failed to serialize TireInfo");
-        
+
         // Deserialize
-        let deserialized: TireInfo = serde_json::from_str(&json)
-            .expect("Failed to deserialize TireInfo");
-        
+        let deserialized: TireInfo =
+            serde_json::from_str(&json).expect("Failed to deserialize TireInfo");
+
         // Verify all fields match
         assert_eq!(deserialized.left_carcass_temp, tire_info.left_carcass_temp);
-        assert_eq!(deserialized.middle_carcass_temp, tire_info.middle_carcass_temp);
-        assert_eq!(deserialized.right_carcass_temp, tire_info.right_carcass_temp);
+        assert_eq!(
+            deserialized.middle_carcass_temp,
+            tire_info.middle_carcass_temp
+        );
+        assert_eq!(
+            deserialized.right_carcass_temp,
+            tire_info.right_carcass_temp
+        );
         assert_eq!(deserialized.left_surface_temp, tire_info.left_surface_temp);
-        assert_eq!(deserialized.middle_surface_temp, tire_info.middle_surface_temp);
-        assert_eq!(deserialized.right_surface_temp, tire_info.right_surface_temp);
+        assert_eq!(
+            deserialized.middle_surface_temp,
+            tire_info.middle_surface_temp
+        );
+        assert_eq!(
+            deserialized.right_surface_temp,
+            tire_info.right_surface_temp
+        );
     }
 
     #[test]
@@ -973,9 +996,9 @@ mod tests {
             timestamp_ms: 9999,
             game_source: GameSource::ACC,
             gear: Some(5),
-            speed_mps: None,  // Explicitly None
+            speed_mps: None, // Explicitly None
             engine_rpm: Some(7000.0),
-            max_engine_rpm: None,  // Explicitly None
+            max_engine_rpm: None, // Explicitly None
             shift_point_rpm: None,
             throttle: Some(1.0),
             brake: None,
@@ -1009,22 +1032,22 @@ mod tests {
 
         // Serialize to JSON
         let json = serde_json::to_string(&telemetry).expect("Failed to serialize");
-        
+
         // Verify that JSON contains null for None fields
         assert!(json.contains("\"speed_mps\":null"));
         assert!(json.contains("\"max_engine_rpm\":null"));
         assert!(json.contains("\"brake\":null"));
         assert!(json.contains("\"latitude_deg\":null"));
-        
+
         // Verify that JSON contains values for Some fields
         assert!(json.contains("\"gear\":5"));
         assert!(json.contains("\"engine_rpm\":7000"));
         assert!(json.contains("\"throttle\":1"));
-        
+
         // Deserialize and verify None values are preserved
-        let deserialized: TelemetryData = serde_json::from_str(&json)
-            .expect("Failed to deserialize");
-        
+        let deserialized: TelemetryData =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+
         assert_eq!(deserialized.speed_mps, None);
         assert_eq!(deserialized.max_engine_rpm, None);
         assert_eq!(deserialized.brake, None);

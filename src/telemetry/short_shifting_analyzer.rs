@@ -27,12 +27,12 @@ impl TelemetryAnalyzer for ShortShiftingAnalyzer {
         _session_info: &super::SessionInfo,
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
-        
+
         // Extract data from TelemetryData
         let cur_gear = telemetry.gear.unwrap_or(0);
         let cur_rpm = telemetry.engine_rpm.unwrap_or(0.0);
         let shift_point_rpm = telemetry.shift_point_rpm.unwrap_or(0.0);
-        
+
         if self.prev_rpm > 0.
             && self.prev_gear > 0
             && cur_gear > self.prev_gear
@@ -57,7 +57,7 @@ impl TelemetryAnalyzer for ShortShiftingAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::telemetry::{SessionInfo, TelemetryAnnotation, TelemetryData, GameSource};
+    use crate::telemetry::{GameSource, SessionInfo, TelemetryAnnotation, TelemetryData};
 
     #[test]
     fn test_short_shift_annotation_inserted() {
@@ -72,7 +72,7 @@ mod tests {
 
         let mut output = analyzer.analyze(&telemetry_data, &session_info);
         assert!(output.is_empty());
-        
+
         let telemetry_data2 = TelemetryData {
             gear: Some(3),
             engine_rpm: Some(5100.0),
@@ -103,7 +103,7 @@ mod tests {
         let session_info = SessionInfo::default();
 
         analyzer.analyze(&telemetry_data, &session_info);
-        
+
         let telemetry_data2 = TelemetryData {
             gear: Some(3),
             engine_rpm: Some(5110.0),
@@ -113,7 +113,7 @@ mod tests {
         let output = analyzer.analyze(&telemetry_data2, &session_info);
         assert!(output.is_empty());
     }
-    
+
     fn create_default_telemetry() -> TelemetryData {
         TelemetryData {
             point_no: 0,
