@@ -127,14 +127,16 @@ mod tests {
         let (tx, rx) = mpsc::channel();
 
         // Create a TelemetryData with IRacing game source
-        let mut telemetry = TelemetryData::default();
-        telemetry.game_source = GameSource::IRacing;
-        telemetry.point_no = 42;
-        telemetry.gear = Some(3);
-        telemetry.speed_mps = Some(45.5);
+        let telemetry = TelemetryData {
+            game_source: GameSource::IRacing,
+            point_no: 42,
+            gear: Some(3),
+            speed_mps: Some(45.5),
+            ..Default::default()
+        };
 
         // Send the data point
-        tx.send(TelemetryOutput::DataPoint(telemetry.clone()))
+        tx.send(TelemetryOutput::DataPoint(Box::new(telemetry.clone())))
             .unwrap();
         drop(tx); // Close the channel so write_telemetry can finish
 
@@ -171,10 +173,12 @@ mod tests {
         let (tx, rx) = mpsc::channel();
 
         // Create a SessionInfo with ACC game source
-        let mut session_info = SessionInfo::default();
-        session_info.game_source = GameSource::ACC;
-        session_info.track_name = "Monza".to_string();
-        session_info.track_configuration = "Full Course".to_string();
+        let session_info = SessionInfo {
+            game_source: GameSource::ACC,
+            track_name: "Monza".to_string(),
+            track_configuration: "Full Course".to_string(),
+            ..Default::default()
+        };
 
         // Send the session change
         tx.send(TelemetryOutput::SessionChange(session_info))
@@ -213,18 +217,22 @@ mod tests {
         let (tx, rx) = mpsc::channel();
 
         // Send a session change
-        let mut session_info = SessionInfo::default();
-        session_info.game_source = GameSource::IRacing;
-        session_info.track_name = "Laguna Seca".to_string();
+        let session_info = SessionInfo {
+            game_source: GameSource::IRacing,
+            track_name: "Laguna Seca".to_string(),
+            ..Default::default()
+        };
         tx.send(TelemetryOutput::SessionChange(session_info))
             .unwrap();
 
         // Send multiple data points
         for i in 0..5 {
-            let mut telemetry = TelemetryData::default();
-            telemetry.game_source = GameSource::IRacing;
-            telemetry.point_no = i;
-            tx.send(TelemetryOutput::DataPoint(telemetry)).unwrap();
+            let telemetry = TelemetryData {
+                game_source: GameSource::IRacing,
+                point_no: i,
+                ..Default::default()
+            };
+            tx.send(TelemetryOutput::DataPoint(Box::new(telemetry))).unwrap();
         }
         drop(tx);
 

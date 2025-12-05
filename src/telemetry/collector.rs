@@ -96,9 +96,9 @@ pub fn collect_telemetry(
             telemetry_data.annotations = annotations;
         }
 
-        telemetry_sender.send(TelemetryOutput::DataPoint(telemetry_data.clone()))?;
+        telemetry_sender.send(TelemetryOutput::DataPoint(Box::new(telemetry_data.clone())))?;
         if let Some(ref writer_sender) = telemetry_writer_sender {
-            writer_sender.send(TelemetryOutput::DataPoint(telemetry_data.clone()))?;
+            writer_sender.send(TelemetryOutput::DataPoint(Box::new(telemetry_data.clone())))?;
         }
     }
 }

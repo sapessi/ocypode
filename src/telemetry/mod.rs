@@ -88,6 +88,7 @@ pub struct TireInfo {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum GameSource {
     IRacing,
     ACC,
@@ -536,7 +537,7 @@ impl TelemetryData {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum TelemetryOutput {
-    DataPoint(TelemetryData),
+    DataPoint(Box<TelemetryData>),
     SessionChange(SessionInfo),
 }
 
@@ -705,7 +706,6 @@ pub trait TelemetryAnalyzer {
     ) -> Vec<TelemetryAnnotation>;
 }
 
-#[cfg(test)]
 #[cfg(test)]
 mod tests {
     use super::*;

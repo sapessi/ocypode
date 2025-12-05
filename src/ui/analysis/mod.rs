@@ -517,6 +517,60 @@ fn is_legacy_format(source_file: &PathBuf) -> bool {
     false
 }
 
+fn load_telemetry_jsonl(source_file: &PathBuf) -> Result<TelemetryFile, OcypodeError> {
+    // Check if this is a legacy format file before attempting to deserialize
+    if is_legacy_format(source_file) {
+        return Err(OcypodeError::LegacyTelemetryFormat);
+    }
+
+    // TODO: Should probably load in a non-blocking way here
+    let telemetry_lines = serde_jsonlines::json_lines(source_file)
+        .map_err(|e| OcypodeError::TelemetryLoaderError { source: e })?
+        .collect::<Result<Vec<TelemetryOutput>, std::io::Error>>()
+        .map_err(|e| {
+            // If deserialization fails, check if it might be a legacy format
+            // that we didn't catch in the initial check
+            if is_legacy_format(source_file) {
+                OcypodeError::LegacyTelemetryFormat
+            } else {
+                OcypodeError::TelemetryLoaderError { source: e }
+            }
+        })?;
+
+    let mut telemetry_data = TelemetryFile::default();
+    let mut cur_lap_no: u32 = 0;
+    let mut cur_session = Session::default();
+    let mut cur_lap = Lap::default();
+    for line in telemetry_lines {
+        match line {
+            TelemetryOutput::DataPoint(telemetry_point) => {
+                let lap_no = telemetry_point.lap_number.unwrap_or(0);
+                if lap_no != cur_lap_no {
+                    cur_session.laps.push(cur_lap.clone());
+                    cur_lap = Lap::default();
+                    cur_lap_no = lap_no;
+                }
+                cur_lap.telemetry.push(*telemetry_point);
+            }
+            TelemetryOutput::SessionChange(session_info) => {
+                if !cur_lap.telemetry.is_empty() {
+                    cur_session.laps.push(cur_lap);
+                }
+                // if we already have data points we are starting a new session
+                if !cur_session.laps.is_empty() {
+                    telemetry_data.sessions.push(cur_session.clone());
+                    cur_session = Session::default();
+                }
+                cur_lap = Lap::default();
+                cur_lap_no = 0;
+                cur_session.info = session_info;
+            }
+        }
+    }
+    telemetry_data.sessions.push(cur_session);
+    Ok(telemetry_data)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -571,58 +625,4 @@ mod tests {
             _ => panic!("Expected LegacyTelemetryFormat error"),
         }
     }
-}
-
-fn load_telemetry_jsonl(source_file: &PathBuf) -> Result<TelemetryFile, OcypodeError> {
-    // Check if this is a legacy format file before attempting to deserialize
-    if is_legacy_format(source_file) {
-        return Err(OcypodeError::LegacyTelemetryFormat);
-    }
-
-    // TODO: Should probably load in a non-blocking way here
-    let telemetry_lines = serde_jsonlines::json_lines(source_file)
-        .map_err(|e| OcypodeError::TelemetryLoaderError { source: e })?
-        .collect::<Result<Vec<TelemetryOutput>, std::io::Error>>()
-        .map_err(|e| {
-            // If deserialization fails, check if it might be a legacy format
-            // that we didn't catch in the initial check
-            if is_legacy_format(source_file) {
-                OcypodeError::LegacyTelemetryFormat
-            } else {
-                OcypodeError::TelemetryLoaderError { source: e }
-            }
-        })?;
-
-    let mut telemetry_data = TelemetryFile::default();
-    let mut cur_lap_no: u32 = 0;
-    let mut cur_session = Session::default();
-    let mut cur_lap = Lap::default();
-    for line in telemetry_lines {
-        match line {
-            TelemetryOutput::DataPoint(telemetry_point) => {
-                let lap_no = telemetry_point.lap_number.unwrap_or(0);
-                if lap_no != cur_lap_no {
-                    cur_session.laps.push(cur_lap.clone());
-                    cur_lap = Lap::default();
-                    cur_lap_no = lap_no;
-                }
-                cur_lap.telemetry.push(telemetry_point);
-            }
-            TelemetryOutput::SessionChange(session_info) => {
-                if !cur_lap.telemetry.is_empty() {
-                    cur_session.laps.push(cur_lap);
-                }
-                // if we already have data points we are starting a new session
-                if !cur_session.laps.is_empty() {
-                    telemetry_data.sessions.push(cur_session.clone());
-                    cur_session = Session::default();
-                }
-                cur_lap = Lap::default();
-                cur_lap_no = 0;
-                cur_session.info = session_info;
-            }
-        }
-    }
-    telemetry_data.sessions.push(cur_session);
-    Ok(telemetry_data)
 }

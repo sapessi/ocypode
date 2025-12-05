@@ -66,6 +66,7 @@ pub trait TelemetryProducer {
     ///
     /// This allows downstream components to handle game-specific differences in
     /// telemetry data availability and format.
+    #[allow(dead_code)]
     fn game_source(&self) -> GameSource;
 }
 
@@ -73,7 +74,7 @@ pub trait TelemetryProducer {
 pub(crate) struct IRacingTelemetryProducer {
     client: Option<simetry::iracing::Client>,
     retry_wait_ms: u64,
-    retry_timeout_s: u64,
+    _retry_timeout_s: u64,
     point_no: usize,
 }
 
@@ -90,7 +91,7 @@ impl IRacingTelemetryProducer {
         Self {
             client: None,
             retry_wait_ms,
-            retry_timeout_s,
+            _retry_timeout_s: retry_timeout_s,
             point_no: 0,
         }
     }
@@ -214,7 +215,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
 pub(crate) struct ACCTelemetryProducer {
     client: Option<simetry::assetto_corsa_competizione::Client>,
     retry_wait_ms: u64,
-    retry_timeout_s: u64,
+    _retry_timeout_s: u64,
     point_no: usize,
 }
 
@@ -231,7 +232,7 @@ impl ACCTelemetryProducer {
         Self {
             client: None,
             retry_wait_ms,
-            retry_timeout_s,
+            _retry_timeout_s: retry_timeout_s,
             point_no: 0,
         }
     }
@@ -431,7 +432,7 @@ impl MockTelemetryProducer {
 
             match output {
                 TelemetryOutput::DataPoint(telemetry) => {
-                    points.push(telemetry);
+                    points.push(*telemetry);
                 }
                 TelemetryOutput::SessionChange(session) => {
                     track_name = session.track_name;

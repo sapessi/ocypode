@@ -19,6 +19,7 @@ use ui::analysis::TelemetryAnalysisApp;
 use ui::live::{HISTORY_SECONDS, LiveTelemetryApp, config::AppConfig};
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
+#[allow(clippy::upper_case_acronyms)]
 enum GameSource {
     #[value(name = "iracing")]
     IRacing,
@@ -36,6 +37,7 @@ enum OcypodeError {
 
     // Errors for the ACC client
     #[snafu(display("Timeout waiting for ACC session"))]
+    #[allow(dead_code)]
     ACCConnectionTimeout,
 
     // Errors while reading and broadcasting telemetry data

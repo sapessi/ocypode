@@ -104,7 +104,7 @@ impl eframe::App for LiveTelemetryApp {
                     }
                 }
 
-                self.telemetry_points.push_back(point.clone());
+                self.telemetry_points.push_back((**point).clone());
 
                 while self.telemetry_points.len() >= self.window_size_points
                     && self.telemetry_points.front().is_some()
