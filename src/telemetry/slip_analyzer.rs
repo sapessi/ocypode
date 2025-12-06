@@ -1,4 +1,4 @@
-use super::TelemetryAnalyzer;
+use super::{TelemetryAnalyzer, TelemetryData};
 
 pub(crate) const STEERING_ANGLE_DEADZONE_RAD: f32 = 0.08;
 
@@ -13,27 +13,33 @@ pub(crate) struct SlipAnalyzer {
 impl TelemetryAnalyzer for SlipAnalyzer {
     fn analyze(
         &mut self,
-        telemetry_point: &super::TelemetryPoint,
+        telemetry: &TelemetryData,
         _session_info: &super::SessionInfo,
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
 
-        if telemetry_point.brake == 0.
-            && telemetry_point.throttle >= self.prev_throttle
-            && telemetry_point.steering > STEERING_ANGLE_DEADZONE_RAD
-            && telemetry_point.cur_speed < self.prev_speed
+        // Extract data from TelemetryData
+        let brake = telemetry.brake.unwrap_or(0.0);
+        let throttle = telemetry.throttle.unwrap_or(0.0);
+        let steering = telemetry.steering_angle_rad.unwrap_or(0.0).abs();
+        let cur_speed = telemetry.speed_mps.unwrap_or(0.0);
+
+        if brake == 0.
+            && throttle >= self.prev_throttle
+            && steering > STEERING_ANGLE_DEADZONE_RAD
+            && cur_speed < self.prev_speed
         {
             output.push(super::TelemetryAnnotation::Slip {
                 prev_speed: self.prev_speed,
-                cur_speed: telemetry_point.cur_speed,
+                cur_speed,
                 is_slip: true,
             });
         }
 
-        self.prev_throttle = telemetry_point.throttle;
-        self.prev_brake = telemetry_point.brake;
-        self.prev_steering_angle = telemetry_point.steering;
-        self.prev_speed = telemetry_point.cur_speed;
+        self.prev_throttle = throttle;
+        self.prev_brake = brake;
+        self.prev_steering_angle = steering;
+        self.prev_speed = cur_speed;
 
         output
     }
@@ -42,17 +48,17 @@ impl TelemetryAnalyzer for SlipAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::telemetry::{SessionInfo, TelemetryAnnotation, TelemetryPoint};
+    use crate::telemetry::{GameSource, SessionInfo, TelemetryAnnotation, TelemetryData};
 
     #[test]
     fn test_slip_annotation_inserted() {
         let mut analyzer = SlipAnalyzer::default();
-        let telemetry_point = TelemetryPoint {
-            throttle: 0.5,
-            brake: 0.0,
-            steering: 0.1,
-            cur_speed: 50.0,
-            ..Default::default()
+        let telemetry_data = TelemetryData {
+            throttle: Some(0.5),
+            brake: Some(0.0),
+            speed_mps: Some(50.0),
+            steering_angle_rad: Some(0.15), // Above deadzone
+            ..create_default_telemetry()
         };
         let session_info = SessionInfo::default();
 
@@ -60,27 +66,32 @@ mod tests {
         analyzer.prev_throttle = 0.4;
         analyzer.prev_speed = 55.0;
 
-        let output = analyzer.analyze(&telemetry_point, &session_info);
+        let output = analyzer.analyze(&telemetry_data, &session_info);
+        // Should produce slip annotation: brake=0, throttle increasing, steering > deadzone, speed decreasing
         assert_eq!(output.len(), 1);
-        assert!(match output.first().unwrap() {
+        match &output[0] {
             TelemetryAnnotation::Slip {
-                prev_speed: _,
-                cur_speed: _,
+                prev_speed,
+                cur_speed,
                 is_slip,
-            } => *is_slip,
-            _ => false,
-        });
+            } => {
+                assert_eq!(*prev_speed, 55.0);
+                assert_eq!(*cur_speed, 50.0);
+                assert!(is_slip);
+            }
+            _ => panic!("Expected Slip annotation"),
+        }
     }
 
     #[test]
     fn test_no_slip_annotation_due_to_brake() {
         let mut analyzer = SlipAnalyzer::default();
-        let telemetry_point = TelemetryPoint {
-            throttle: 0.5,
-            brake: 0.1,
-            steering: 0.1,
-            cur_speed: 50.0,
-            ..Default::default()
+        let telemetry_data = TelemetryData {
+            throttle: Some(0.5),
+            brake: Some(0.1),
+            speed_mps: Some(50.0),
+            steering_angle_rad: Some(0.15),
+            ..create_default_telemetry()
         };
         let session_info = SessionInfo::default();
 
@@ -88,39 +99,19 @@ mod tests {
         analyzer.prev_throttle = 0.4;
         analyzer.prev_speed = 55.0;
 
-        let output = analyzer.analyze(&telemetry_point, &session_info);
-        assert!(output.is_empty());
-    }
-
-    #[test]
-    fn test_no_slip_annotation_due_to_steering() {
-        let mut analyzer = SlipAnalyzer::default();
-        let telemetry_point = TelemetryPoint {
-            throttle: 0.5,
-            brake: 0.0,
-            steering: 0.05,
-            cur_speed: 50.0,
-            ..Default::default()
-        };
-        let session_info = SessionInfo::default();
-
-        // Initial state
-        analyzer.prev_throttle = 0.4;
-        analyzer.prev_speed = 55.0;
-
-        let output = analyzer.analyze(&telemetry_point, &session_info);
+        let output = analyzer.analyze(&telemetry_data, &session_info);
         assert!(output.is_empty());
     }
 
     #[test]
     fn test_no_slip_annotation_due_to_speed() {
         let mut analyzer = SlipAnalyzer::default();
-        let telemetry_point = TelemetryPoint {
-            throttle: 0.5,
-            brake: 0.0,
-            steering: 0.1,
-            cur_speed: 60.0,
-            ..Default::default()
+        let telemetry_data = TelemetryData {
+            throttle: Some(0.5),
+            brake: Some(0.0),
+            speed_mps: Some(60.0),
+            steering_angle_rad: Some(0.15),
+            ..create_default_telemetry()
         };
         let session_info = SessionInfo::default();
 
@@ -128,7 +119,68 @@ mod tests {
         analyzer.prev_throttle = 0.4;
         analyzer.prev_speed = 55.0;
 
-        let output = analyzer.analyze(&telemetry_point, &session_info);
+        let output = analyzer.analyze(&telemetry_data, &session_info);
         assert!(output.is_empty());
+    }
+
+    #[test]
+    fn test_no_slip_annotation_due_to_low_steering() {
+        let mut analyzer = SlipAnalyzer::default();
+        let telemetry_data = TelemetryData {
+            throttle: Some(0.5),
+            brake: Some(0.0),
+            speed_mps: Some(50.0),
+            steering_angle_rad: Some(0.05), // Below deadzone
+            ..create_default_telemetry()
+        };
+        let session_info = SessionInfo::default();
+
+        // Initial state
+        analyzer.prev_throttle = 0.4;
+        analyzer.prev_speed = 55.0;
+
+        let output = analyzer.analyze(&telemetry_data, &session_info);
+        assert!(output.is_empty());
+    }
+
+    fn create_default_telemetry() -> TelemetryData {
+        TelemetryData {
+            point_no: 0,
+            timestamp_ms: 0,
+            game_source: GameSource::IRacing,
+            gear: Some(1),
+            speed_mps: Some(0.0),
+            engine_rpm: Some(0.0),
+            max_engine_rpm: Some(6000.0),
+            shift_point_rpm: Some(5500.0),
+            throttle: Some(0.0),
+            brake: Some(0.0),
+            clutch: Some(0.0),
+            steering_angle_rad: None,
+            steering_pct: None,
+            lap_distance_m: None,
+            lap_distance_pct: None,
+            lap_number: None,
+            last_lap_time_s: None,
+            best_lap_time_s: None,
+            is_pit_limiter_engaged: None,
+            is_in_pit_lane: None,
+            is_abs_active: None,
+            latitude_deg: None,
+            longitude_deg: None,
+            lateral_accel_mps2: None,
+            longitudinal_accel_mps2: None,
+            pitch_rad: None,
+            pitch_rate_rps: None,
+            roll_rad: None,
+            roll_rate_rps: None,
+            yaw_rad: None,
+            yaw_rate_rps: None,
+            lf_tire_info: None,
+            rf_tire_info: None,
+            lr_tire_info: None,
+            rr_tire_info: None,
+            annotations: Vec::new(),
+        }
     }
 }

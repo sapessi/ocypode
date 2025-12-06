@@ -8,7 +8,7 @@ use config::AppConfig;
 use egui::{Color32, ViewportBuilder, ViewportId, Visuals, style::Widgets};
 use log::error;
 
-use crate::telemetry::{TelemetryOutput, TelemetryPoint};
+use crate::telemetry::{TelemetryData, TelemetryOutput};
 
 use super::ScrubSlipAlert;
 
@@ -42,7 +42,7 @@ const DEFAULT_WINDOW_TRANSPARENCY: u8 = 191;
 pub struct LiveTelemetryApp {
     telemetry_receiver: Receiver<TelemetryOutput>,
     window_size_points: usize,
-    telemetry_points: VecDeque<TelemetryPoint>,
+    telemetry_points: VecDeque<TelemetryData>,
     app_config: AppConfig,
     scrub_slip_alert: ScrubSlipAlert,
 }
@@ -104,7 +104,7 @@ impl eframe::App for LiveTelemetryApp {
                     }
                 }
 
-                self.telemetry_points.push_back(point.clone());
+                self.telemetry_points.push_back((**point).clone());
 
                 while self.telemetry_points.len() >= self.window_size_points
                     && self.telemetry_points.front().is_some()
