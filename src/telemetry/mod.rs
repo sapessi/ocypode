@@ -763,6 +763,17 @@ impl Default for SessionInfo {
 ///
 /// This trait supports Requirements 1.2 and 5.1 by providing a game-agnostic interface
 /// for telemetry analysis that works with the intermediate representation.
+/// Trait for analyzing telemetry data and detecting driving issues.
+///
+/// Analyzers process telemetry data to identify specific driving patterns or issues
+/// such as slip, wheelspin, scrubbing, trail braking, and short shifting. Each analyzer
+/// receives the unified `TelemetryData` representation, which provides access to all
+/// available telemetry fields regardless of the source game.
+///
+/// # Requirements
+///
+/// This trait supports Requirements 1.2 and 5.1 by providing a game-agnostic interface
+/// for telemetry analysis that works with the intermediate representation.
 pub trait TelemetryAnalyzer {
     /// Analyze telemetry data and return any detected annotations.
     ///

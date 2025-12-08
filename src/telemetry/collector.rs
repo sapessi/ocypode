@@ -265,6 +265,7 @@ mod tests {
             let data_point = telemetry_receiver.recv().unwrap();
             if let TelemetryOutput::DataPoint(measurement) = data_point {
                 assert!(measurement.gear == Some(2) || measurement.gear == Some(3));
+                assert!(measurement.gear == Some(2) || measurement.gear == Some(3));
             } else {
                 panic!("Expected DataPoint");
             }
@@ -280,6 +281,7 @@ mod tests {
         for _ in 0..2 {
             let writer_data_point = writer_receiver.recv().unwrap();
             if let TelemetryOutput::DataPoint(measurement) = writer_data_point {
+                assert!(measurement.gear == Some(2) || measurement.gear == Some(3));
                 assert!(measurement.gear == Some(2) || measurement.gear == Some(3));
             } else {
                 panic!("Expected DataPoint: {:?}", writer_data_point);
@@ -345,6 +347,7 @@ mod tests {
         for _ in 0..2 {
             let data_point = telemetry_receiver.recv().unwrap();
             if let TelemetryOutput::DataPoint(measurement) = data_point {
+                assert!(measurement.gear == Some(2) || measurement.gear == Some(3));
                 assert!(measurement.gear == Some(2) || measurement.gear == Some(3));
             } else {
                 panic!("Expected DataPoint");

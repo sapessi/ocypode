@@ -364,7 +364,7 @@ impl TelemetryProducer for ACCTelemetryProducer {
 /// - Unit testing of telemetry processing logic without requiring a running game
 /// - Offline analysis of previously recorded telemetry sessions
 /// - Reproducible test scenarios for analyzer validation
-pub struct MockTelemetryProducer {
+pub(crate) struct MockTelemetryProducer {
     cur_tick: usize,
     points: Vec<TelemetryData>,
     pub track_name: String,

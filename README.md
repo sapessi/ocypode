@@ -13,6 +13,15 @@ Ocypode supports telemetry from multiple racing simulations:
 
 Additional games can be added through the [simetry](https://github.com/adnanademovic/simetry) library.
 
+## Supported Games
+
+Ocypode supports telemetry from multiple racing simulations:
+
+- **iRacing** - Full support for all telemetry features
+- **Assetto Corsa Competizione (ACC)** - Full support for all telemetry features
+
+Additional games can be added through the [simetry](https://github.com/adnanademovic/simetry) library.
+
 ## Why Ocypode
 There are lots of telemetry overlays out there. However, I couldn't find one that **(1) gave you a real-time, intuitive view of your driving errors, (2) provided intelligent setup recommendations, and (3) didn't require some sort of paid subscription.**
 
@@ -71,8 +80,123 @@ $ cargo run -- live --game iracing --output my_session.jsonl
 #### Loading Saved Telemetry
 
 To load and analyze previously saved telemetry:
+## Usage
+
+### Prerequisites
+
+1. Install the [Rust toolchain using `rustup`](https://rustup.rs/)
+2. Have one of the supported racing simulations installed and running
+
+### Running Ocypode
+
+Ocypode requires you to specify which racing simulation to connect to using the `--game` (or `-g`) parameter.
+
+#### Live Telemetry Mode
+
+To run Ocypode with live telemetry from iRacing:
 
 ```sh
+$ cargo run -- live --game iracing
+```
+
+To run Ocypode with live telemetry from Assetto Corsa Competizione:
+
+```sh
+$ cargo run -- live --game acc
+```
+
+#### Saving Telemetry Data
+
+To save telemetry data to a file for later analysis:
+
+```sh
+$ cargo run -- live --game iracing --output my_session.jsonl
+```
+
+#### Loading Saved Telemetry
+
+To load and analyze previously saved telemetry:
+
+```sh
+$ cargo run -- load --input my_session.jsonl
+```
+
+### Command-Line Options
+
+**Live Mode:**
+```
+cargo run -- live [OPTIONS]
+
+Options:
+  -g, --game <GAME>        Racing simulation to connect to [possible values: iracing, acc]
+  -w, --window <WINDOW>    History window size in seconds [default: 10]
+  -o, --output <OUTPUT>    Optional file path to save telemetry data
+  -h, --help              Print help
+```
+
+**Load Mode:**
+```
+cargo run -- load [OPTIONS]
+
+Options:
+  -i, --input <INPUT>     Path to telemetry file to load
+  -h, --help             Print help
+```
+
+### Connection Behavior
+
+When you start Ocypode in live mode:
+
+1. The application will attempt to connect to the specified game
+2. If the game is not running, Ocypode will wait and retry connection attempts
+3. Once connected, telemetry data will be displayed in real-time
+4. The application will continue running until you close it (Ctrl+C)
+
+## Migration Notes
+
+### Breaking Changes in v0.3.0
+
+**Important:** Version 0.3.0 introduces breaking changes to the telemetry file format. Telemetry files created with older versions of Ocypode (v0.2.0 and earlier) are **not compatible** with v0.3.0 and later.
+
+#### What Changed
+
+1. **Unified telemetry representation:** The application now uses a single `TelemetryData` struct throughout, replacing the previous `SerializableTelemetry` format
+2. **Explicit unit suffixes:** All field names now include explicit unit suffixes for clarity (e.g., `steering_angle_rad`, `speed_mps`, `latitude_deg`)
+3. **Improved field naming:** Field names have been updated for consistency and clarity:
+   - `steering` → `steering_angle_rad`
+   - `lap_distance` → `lap_distance_m`
+   - `abs_active` → `is_abs_active`
+   - `lat`/`lon` → `latitude_deg`/`longitude_deg`
+   - `lat_accel`/`lon_accel` → `lateral_accel_mps2`/`longitudinal_accel_mps2`
+   - All orientation fields now include `_rad` suffix
+   - All rate fields now include `_rps` suffix
+4. **Eliminated unsafe code:** The telemetry system no longer uses unsafe downcasting, improving reliability and maintainability
+
+#### Migration Path
+
+There is **no automatic migration** from older formats. To use your telemetry data with v0.3.0:
+
+1. Re-record your telemetry sessions using the updated application
+2. The new format will automatically use the updated field names with explicit units
+
+#### Loading Legacy Files
+
+If you attempt to load a telemetry file created with an older version, you will see this error:
+
+```
+Error: This telemetry file was created with an older version of Ocypode and is not 
+compatible with the current version. Please re-record your session.
+```
+
+For detailed information about the new file format, see [TELEMETRY_FILE_FORMAT.md](TELEMETRY_FILE_FORMAT.md).
+
+For a complete migration guide with code examples, see [MIGRATION.md](MIGRATION.md).
+
+### Previous Breaking Changes
+
+#### v0.2.0
+
+Version 0.2.0 introduced multi-game support and the `SerializableTelemetry` format with a `game_source` field. Files from v0.1.0 are not compatible with v0.2.0 or later.
 $ cargo run -- load --input my_session.jsonl
 ```
 
