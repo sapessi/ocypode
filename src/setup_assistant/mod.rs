@@ -561,20 +561,22 @@ mod tests {
         let mut assistant = SetupAssistant::new();
 
         // Add some findings
-        let mut telemetry = TelemetryData::default();
-        telemetry.annotations = vec![
-            TelemetryAnnotation::Scrub {
-                avg_yaw_rate_change: 0.5,
-                cur_yaw_rate_change: 0.8,
-                is_scrubbing: true,
-            },
-            TelemetryAnnotation::Wheelspin {
-                avg_rpm_increase_per_gear: std::collections::HashMap::new(),
-                cur_gear: 2,
-                cur_rpm_increase: 500.0,
-                is_wheelspin: true,
-            },
-        ];
+        let telemetry = TelemetryData {
+            annotations: vec![
+                TelemetryAnnotation::Scrub {
+                    avg_yaw_rate_change: 0.5,
+                    cur_yaw_rate_change: 0.8,
+                    is_scrubbing: true,
+                },
+                TelemetryAnnotation::Wheelspin {
+                    avg_rpm_increase_per_gear: std::collections::HashMap::new(),
+                    cur_gear: 2,
+                    cur_rpm_increase: 500.0,
+                    is_wheelspin: true,
+                },
+            ],
+            ..Default::default()
+        };
 
         // Process telemetry multiple times
         for _ in 0..5 {
@@ -648,12 +650,14 @@ mod tests {
 
         let mut assistant = SetupAssistant::new();
 
-        let mut telemetry = TelemetryData::default();
-        telemetry.annotations = vec![TelemetryAnnotation::Scrub {
-            avg_yaw_rate_change: 0.5,
-            cur_yaw_rate_change: 0.8,
-            is_scrubbing: true,
-        }];
+        let telemetry = TelemetryData {
+            annotations: vec![TelemetryAnnotation::Scrub {
+                avg_yaw_rate_change: 0.5,
+                cur_yaw_rate_change: 0.8,
+                is_scrubbing: true,
+            }],
+            ..Default::default()
+        };
 
         assistant.process_telemetry(&telemetry);
 
@@ -672,12 +676,14 @@ mod tests {
 
         let mut assistant = SetupAssistant::new();
 
-        let mut telemetry = TelemetryData::default();
-        telemetry.annotations = vec![TelemetryAnnotation::Scrub {
-            avg_yaw_rate_change: 0.5,
-            cur_yaw_rate_change: 0.8,
-            is_scrubbing: true,
-        }];
+        let telemetry = TelemetryData {
+            annotations: vec![TelemetryAnnotation::Scrub {
+                avg_yaw_rate_change: 0.5,
+                cur_yaw_rate_change: 0.8,
+                is_scrubbing: true,
+            }],
+            ..Default::default()
+        };
 
         // Process same annotation 3 times
         assistant.process_telemetry(&telemetry);
@@ -696,10 +702,12 @@ mod tests {
     fn test_classify_corner_phase_entry() {
         use crate::telemetry::TelemetryData;
 
-        let mut telemetry = TelemetryData::default();
-        telemetry.brake = Some(0.8);
-        telemetry.throttle = Some(0.0);
-        telemetry.steering_pct = Some(0.3);
+        let telemetry = TelemetryData {
+            brake: Some(0.8),
+            throttle: Some(0.0),
+            steering_pct: Some(0.3),
+            ..Default::default()
+        };
 
         let phase = SetupAssistant::classify_corner_phase(&telemetry);
         assert_eq!(phase, CornerPhase::Entry);
@@ -709,10 +717,12 @@ mod tests {
     fn test_classify_corner_phase_exit() {
         use crate::telemetry::TelemetryData;
 
-        let mut telemetry = TelemetryData::default();
-        telemetry.brake = Some(0.0);
-        telemetry.throttle = Some(0.7);
-        telemetry.steering_pct = Some(0.3);
+        let telemetry = TelemetryData {
+            brake: Some(0.0),
+            throttle: Some(0.7),
+            steering_pct: Some(0.3),
+            ..Default::default()
+        };
 
         let phase = SetupAssistant::classify_corner_phase(&telemetry);
         assert_eq!(phase, CornerPhase::Exit);
@@ -722,10 +732,12 @@ mod tests {
     fn test_classify_corner_phase_mid() {
         use crate::telemetry::TelemetryData;
 
-        let mut telemetry = TelemetryData::default();
-        telemetry.brake = Some(0.0);
-        telemetry.throttle = Some(0.0);
-        telemetry.steering_pct = Some(0.3);
+        let telemetry = TelemetryData {
+            brake: Some(0.0),
+            throttle: Some(0.0),
+            steering_pct: Some(0.3),
+            ..Default::default()
+        };
 
         let phase = SetupAssistant::classify_corner_phase(&telemetry);
         assert_eq!(phase, CornerPhase::Mid);
@@ -735,10 +747,12 @@ mod tests {
     fn test_classify_corner_phase_straight() {
         use crate::telemetry::TelemetryData;
 
-        let mut telemetry = TelemetryData::default();
-        telemetry.brake = Some(0.0);
-        telemetry.throttle = Some(0.8);
-        telemetry.steering_pct = Some(0.01);
+        let telemetry = TelemetryData {
+            brake: Some(0.0),
+            throttle: Some(0.8),
+            steering_pct: Some(0.01),
+            ..Default::default()
+        };
 
         let phase = SetupAssistant::classify_corner_phase(&telemetry);
         assert_eq!(phase, CornerPhase::Straight);
@@ -748,9 +762,11 @@ mod tests {
     fn test_slip_classification_during_braking() {
         use crate::telemetry::{TelemetryAnnotation, TelemetryData};
 
-        let mut telemetry = TelemetryData::default();
-        telemetry.brake = Some(0.8);
-        telemetry.throttle = Some(0.0);
+        let telemetry = TelemetryData {
+            brake: Some(0.8),
+            throttle: Some(0.0),
+            ..Default::default()
+        };
 
         let annotation = TelemetryAnnotation::Slip {
             prev_speed: 50.0,
@@ -766,9 +782,11 @@ mod tests {
     fn test_slip_classification_during_throttle() {
         use crate::telemetry::{TelemetryAnnotation, TelemetryData};
 
-        let mut telemetry = TelemetryData::default();
-        telemetry.brake = Some(0.0);
-        telemetry.throttle = Some(0.8);
+        let telemetry = TelemetryData {
+            brake: Some(0.0),
+            throttle: Some(0.8),
+            ..Default::default()
+        };
 
         let annotation = TelemetryAnnotation::Slip {
             prev_speed: 50.0,
@@ -784,9 +802,11 @@ mod tests {
     fn test_slip_classification_during_coasting() {
         use crate::telemetry::{TelemetryAnnotation, TelemetryData};
 
-        let mut telemetry = TelemetryData::default();
-        telemetry.brake = Some(0.0);
-        telemetry.throttle = Some(0.0);
+        let telemetry = TelemetryData {
+            brake: Some(0.0),
+            throttle: Some(0.0),
+            ..Default::default()
+        };
 
         let annotation = TelemetryAnnotation::Slip {
             prev_speed: 50.0,
@@ -864,20 +884,22 @@ mod tests {
         let mut assistant = SetupAssistant::new();
 
         // Add some findings through telemetry processing
-        let mut telemetry = TelemetryData::default();
-        telemetry.annotations = vec![
-            TelemetryAnnotation::Scrub {
-                avg_yaw_rate_change: 0.5,
-                cur_yaw_rate_change: 0.8,
-                is_scrubbing: true,
-            },
-            TelemetryAnnotation::Wheelspin {
-                avg_rpm_increase_per_gear: std::collections::HashMap::new(),
-                cur_gear: 2,
-                cur_rpm_increase: 500.0,
-                is_wheelspin: true,
-            },
-        ];
+        let telemetry = TelemetryData {
+            annotations: vec![
+                TelemetryAnnotation::Scrub {
+                    avg_yaw_rate_change: 0.5,
+                    cur_yaw_rate_change: 0.8,
+                    is_scrubbing: true,
+                },
+                TelemetryAnnotation::Wheelspin {
+                    avg_rpm_increase_per_gear: std::collections::HashMap::new(),
+                    cur_gear: 2,
+                    cur_rpm_increase: 500.0,
+                    is_wheelspin: true,
+                },
+            ],
+            ..Default::default()
+        };
         assistant.process_telemetry(&telemetry);
 
         // Verify we have findings but no confirmations
@@ -925,12 +947,14 @@ mod tests {
         let mut assistant = SetupAssistant::new();
 
         // Add some findings
-        let mut telemetry = TelemetryData::default();
-        telemetry.annotations = vec![TelemetryAnnotation::Scrub {
-            avg_yaw_rate_change: 0.5,
-            cur_yaw_rate_change: 0.8,
-            is_scrubbing: true,
-        }];
+        let telemetry = TelemetryData {
+            annotations: vec![TelemetryAnnotation::Scrub {
+                avg_yaw_rate_change: 0.5,
+                cur_yaw_rate_change: 0.8,
+                is_scrubbing: true,
+            }],
+            ..Default::default()
+        };
         assistant.process_telemetry(&telemetry);
 
         // Confirm a finding
@@ -963,12 +987,14 @@ mod tests {
         let mut assistant = SetupAssistant::new();
 
         // Add multiple occurrences of the same finding
-        let mut telemetry = TelemetryData::default();
-        telemetry.annotations = vec![TelemetryAnnotation::Scrub {
-            avg_yaw_rate_change: 0.5,
-            cur_yaw_rate_change: 0.8,
-            is_scrubbing: true,
-        }];
+        let telemetry = TelemetryData {
+            annotations: vec![TelemetryAnnotation::Scrub {
+                avg_yaw_rate_change: 0.5,
+                cur_yaw_rate_change: 0.8,
+                is_scrubbing: true,
+            }],
+            ..Default::default()
+        };
 
         for _ in 0..5 {
             assistant.process_telemetry(&telemetry);
@@ -1000,20 +1026,22 @@ mod tests {
         let mut assistant = SetupAssistant::new();
 
         // Simulate a session with multiple findings
-        let mut telemetry = TelemetryData::default();
-        telemetry.annotations = vec![
-            TelemetryAnnotation::Scrub {
-                avg_yaw_rate_change: 0.5,
-                cur_yaw_rate_change: 0.8,
-                is_scrubbing: true,
-            },
-            TelemetryAnnotation::Wheelspin {
-                avg_rpm_increase_per_gear: std::collections::HashMap::new(),
-                cur_gear: 2,
-                cur_rpm_increase: 500.0,
-                is_wheelspin: true,
-            },
-        ];
+        let telemetry = TelemetryData {
+            annotations: vec![
+                TelemetryAnnotation::Scrub {
+                    avg_yaw_rate_change: 0.5,
+                    cur_yaw_rate_change: 0.8,
+                    is_scrubbing: true,
+                },
+                TelemetryAnnotation::Wheelspin {
+                    avg_rpm_increase_per_gear: std::collections::HashMap::new(),
+                    cur_gear: 2,
+                    cur_rpm_increase: 500.0,
+                    is_wheelspin: true,
+                },
+            ],
+            ..Default::default()
+        };
 
         for _ in 0..3 {
             assistant.process_telemetry(&telemetry);
@@ -1065,25 +1093,6 @@ mod proptests {
     use crate::telemetry::{GameSource, TelemetryAnnotation, TelemetryData};
     use proptest::prelude::*;
     use std::collections::HashMap;
-
-    // Generators for property-based testing
-
-    fn arb_finding_type() -> impl Strategy<Value = FindingType> {
-        prop_oneof![
-            Just(FindingType::CornerEntryUndersteer),
-            Just(FindingType::CornerEntryOversteer),
-            Just(FindingType::MidCornerUndersteer),
-            Just(FindingType::MidCornerOversteer),
-            Just(FindingType::CornerExitUndersteer),
-            Just(FindingType::CornerExitPowerOversteer),
-            Just(FindingType::FrontBrakeLock),
-            Just(FindingType::RearBrakeLock),
-            Just(FindingType::TireOverheating),
-            Just(FindingType::TireCold),
-            Just(FindingType::BottomingOut),
-            Just(FindingType::ExcessiveTrailbraking),
-        ]
-    }
 
     fn arb_annotation() -> impl Strategy<Value = TelemetryAnnotation> {
         prop_oneof![
@@ -1248,10 +1257,11 @@ mod proptests {
             throttle in 0.0f32..1.0,
             steering_pct in -1.0f32..1.0,
         ) {
-            let mut telemetry = TelemetryData::default();
-            telemetry.brake = Some(brake);
-            telemetry.throttle = Some(throttle);
-            telemetry.steering_pct = Some(steering_pct);
+            let telemetry = TelemetryData {
+            brake: Some(brake),
+            throttle: Some(throttle),
+            steering_pct: Some(steering_pct),
+            .. Default::default() };
 
             let phase = SetupAssistant::classify_corner_phase(&telemetry);
 
@@ -1313,10 +1323,10 @@ mod proptests {
             prev_speed in 0.0f32..100.0,
             cur_speed in 0.0f32..100.0,
         ) {
-            let mut telemetry = TelemetryData::default();
-            telemetry.brake = Some(brake);
-            telemetry.throttle = Some(throttle);
-
+            let telemetry = TelemetryData {
+            brake: Some(brake),
+            throttle: Some(throttle),
+            .. Default::default() };
             let annotation = TelemetryAnnotation::Slip {
                 prev_speed,
                 cur_speed,

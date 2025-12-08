@@ -228,23 +228,21 @@ mod tests {
             let output = analyzer.analyze(&telemetry, &session_info);
 
             // After sufficient samples, should detect overheating
-            if i >= 60 * MIN_SAMPLES {
-                if !output.is_empty() {
-                    assert_eq!(output.len(), 1);
-                    match &output[0] {
-                        TelemetryAnnotation::TireOverheating {
-                            avg_temp,
-                            optimal_max,
-                            is_overheating,
-                        } => {
-                            assert!(*is_overheating);
-                            assert!(*avg_temp > *optimal_max);
-                            assert_eq!(*optimal_max, 95.0);
-                        }
-                        _ => panic!("Expected TireOverheating annotation"),
+            if i >= 60 * MIN_SAMPLES && !output.is_empty() {
+                assert_eq!(output.len(), 1);
+                match &output[0] {
+                    TelemetryAnnotation::TireOverheating {
+                        avg_temp,
+                        optimal_max,
+                        is_overheating,
+                    } => {
+                        assert!(*is_overheating);
+                        assert!(*avg_temp > *optimal_max);
+                        assert_eq!(*optimal_max, 95.0);
                     }
-                    return; // Test passed
+                    _ => panic!("Expected TireOverheating annotation"),
                 }
+                return; // Test passed
             }
 
             timestamp_ms += 16; // ~60Hz
@@ -267,23 +265,21 @@ mod tests {
             let output = analyzer.analyze(&telemetry, &session_info);
 
             // After sufficient samples, should detect cold tires
-            if i >= 60 * MIN_SAMPLES {
-                if !output.is_empty() {
-                    assert_eq!(output.len(), 1);
-                    match &output[0] {
-                        TelemetryAnnotation::TireCold {
-                            avg_temp,
-                            optimal_min,
-                            is_cold,
-                        } => {
-                            assert!(*is_cold);
-                            assert!(*avg_temp < *optimal_min);
-                            assert_eq!(*optimal_min, 80.0);
-                        }
-                        _ => panic!("Expected TireCold annotation"),
+            if i >= 60 * MIN_SAMPLES && !output.is_empty() {
+                assert_eq!(output.len(), 1);
+                match &output[0] {
+                    TelemetryAnnotation::TireCold {
+                        avg_temp,
+                        optimal_min,
+                        is_cold,
+                    } => {
+                        assert!(*is_cold);
+                        assert!(*avg_temp < *optimal_min);
+                        assert_eq!(*optimal_min, 80.0);
                     }
-                    return; // Test passed
+                    _ => panic!("Expected TireCold annotation"),
                 }
+                return; // Test passed
             }
 
             timestamp_ms += 16;

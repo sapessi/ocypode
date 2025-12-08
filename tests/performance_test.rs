@@ -16,10 +16,9 @@ fn test_high_frequency_telemetry_processing() {
     let mut telemetry_points = Vec::new();
     for line in reader.lines() {
         let line = line.expect("Failed to read line");
-        if let Ok(output) = serde_json::from_str::<TelemetryOutput>(&line) {
-            if let TelemetryOutput::DataPoint(data) = output {
-                telemetry_points.push(*data);
-            }
+        if let Ok(TelemetryOutput::DataPoint(data)) = serde_json::from_str::<TelemetryOutput>(&line)
+        {
+            telemetry_points.push(*data);
         }
     }
 

@@ -19,7 +19,6 @@ use ocypode::telemetry::TelemetryOutput;
 /// Helper function to process a telemetry file and return the Setup Assistant state
 /// This directly processes telemetry data without using the collector thread
 fn process_telemetry_file(file_path: &str) -> Result<SetupAssistant, Box<dyn std::error::Error>> {
-    use ocypode::telemetry::TelemetryData;
     use std::io::BufRead;
 
     // Read the file directly
@@ -307,7 +306,7 @@ fn test_analyzer_integration() {
 
     let mut analyzer_findings: HashMap<&str, Vec<&FindingType>> = HashMap::new();
 
-    for (finding_type, _) in findings {
+    for finding_type in findings.keys() {
         let analyzer_name = match finding_type {
             FindingType::CornerEntryUndersteer => "Scrub/Slip Analyzer",
             FindingType::CornerEntryOversteer => "Entry Oversteer Analyzer",
@@ -326,7 +325,7 @@ fn test_analyzer_integration() {
 
         analyzer_findings
             .entry(analyzer_name)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(finding_type);
     }
 
