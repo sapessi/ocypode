@@ -8,10 +8,15 @@ use crate::OcypodeError;
 
 use super::{
     TelemetryAnalyzer, TelemetryAnnotation, TelemetryOutput,
+    bottoming_out_analyzer::BottomingOutAnalyzer,
+    brake_lock_analyzer::BrakeLockAnalyzer,
+    entry_oversteer_analyzer::EntryOversteerAnalyzer,
+    mid_corner_analyzer::MidCornerAnalyzer,
     producer::{CONN_RETRY_MAX_WAIT_S, TelemetryProducer},
     scrub_analyzer::ScrubAnalyzer,
     short_shifting_analyzer::ShortShiftingAnalyzer,
     slip_analyzer::SlipAnalyzer,
+    tire_temperature_analyzer::TireTemperatureAnalyzer,
     trailbrake_steering_analyzer::{
         MAX_TRAILBRAKING_STEERING_ANGLE, MIN_TRAILBRAKING_PCT, TrailbrakeSteeringAnalyzer,
     },
@@ -22,16 +27,28 @@ const REFRESH_RATE_MS: u64 = 100;
 const MIN_WHEELSPIN_POINTS: usize = 100;
 const SESSION_UPDATE_TIME_MS: u128 = 2000;
 
+// Configuration for new analyzers
+const ENTRY_OVERSTEER_WINDOW_SIZE: usize = 100;
+const ENTRY_OVERSTEER_MIN_POINTS: usize = 50;
+const MID_CORNER_WINDOW_SIZE: usize = 100;
+const MID_CORNER_MIN_POINTS: usize = 50;
+
 pub fn collect_telemetry(
     mut producer: impl TelemetryProducer,
     telemetry_sender: Sender<TelemetryOutput>,
     telemetry_writer_sender: Option<Sender<TelemetryOutput>>,
 ) -> Result<(), OcypodeError> {
+    use log::{debug, info};
+
+    info!("Telemetry collector: Starting producer...");
     producer.start()?;
+    info!("Telemetry collector: Producer started, waiting for active session...");
 
     wait_for_session(&mut producer)?;
+    info!("Telemetry collector: Active session detected, beginning data collection...");
 
     let mut analyzers: Vec<Box<dyn TelemetryAnalyzer>> = vec![
+        // Existing analyzers
         Box::new(WheelspinAnalyzer::<MIN_WHEELSPIN_POINTS>::new()),
         Box::new(TrailbrakeSteeringAnalyzer::new(
             MAX_TRAILBRAKING_STEERING_ANGLE,
@@ -40,16 +57,34 @@ pub fn collect_telemetry(
         Box::new(ShortShiftingAnalyzer::default()),
         Box::new(SlipAnalyzer::default()),
         Box::new(ScrubAnalyzer::<100>::new(100)), // TODO: The maximum number of points should be dynamic based on the length of the track
+        // New analyzers for Setup Assistant
+        Box::new(EntryOversteerAnalyzer::<ENTRY_OVERSTEER_WINDOW_SIZE>::new(
+            ENTRY_OVERSTEER_MIN_POINTS,
+        )),
+        Box::new(MidCornerAnalyzer::<MID_CORNER_WINDOW_SIZE>::new(
+            MID_CORNER_MIN_POINTS,
+        )),
+        Box::new(BrakeLockAnalyzer::new()),
+        Box::new(TireTemperatureAnalyzer::new()),
+        Box::new(BottomingOutAnalyzer::new()),
     ];
 
     // if we cannot fetch session info at this point something has gone really wrong.
     // I'll just let it fail.
     let mut last_session_info_check_time = SystemTime::now();
     let mut last_session_info = producer.session_info().unwrap();
+
+    info!(
+        "Telemetry collector: Sending initial session info (track: {})",
+        last_session_info.track_name
+    );
     telemetry_sender.send(TelemetryOutput::SessionChange(last_session_info.clone()))?;
     if let Some(ref writer_sender) = telemetry_writer_sender {
         writer_sender.send(TelemetryOutput::SessionChange(last_session_info.clone()))?;
     }
+
+    info!("Telemetry collector: Entering main collection loop...");
+    let mut points_collected = 0;
 
     loop {
         thread::sleep(Duration::from_millis(REFRESH_RATE_MS));
@@ -84,9 +119,17 @@ pub fn collect_telemetry(
 
         // Get telemetry as TelemetryData
         let mut telemetry_data = producer.telemetry()?;
+        points_collected += 1;
+
+        if points_collected == 1 {
+            info!("Telemetry collector: First data point received!");
+        } else if points_collected % 100 == 0 {
+            debug!("Telemetry collector: {} points collected", points_collected);
+        }
 
         // Run analyzers on the TelemetryData
-        let mut annotations: Vec<TelemetryAnnotation> = Vec::new();
+        // Pre-allocate with capacity to avoid reallocations
+        let mut annotations: Vec<TelemetryAnnotation> = Vec::with_capacity(10);
         for analyzer in analyzers.iter_mut() {
             annotations.append(&mut analyzer.analyze(&telemetry_data, &last_session_info));
         }
@@ -96,28 +139,57 @@ pub fn collect_telemetry(
             telemetry_data.annotations = annotations;
         }
 
-        telemetry_sender.send(TelemetryOutput::DataPoint(Box::new(telemetry_data.clone())))?;
+        // Box the telemetry data once and clone the Box (cheaper than cloning the data)
+        let boxed_data = Box::new(telemetry_data);
+        telemetry_sender.send(TelemetryOutput::DataPoint(boxed_data.clone()))?;
         if let Some(ref writer_sender) = telemetry_writer_sender {
-            writer_sender.send(TelemetryOutput::DataPoint(Box::new(telemetry_data.clone())))?;
+            writer_sender.send(TelemetryOutput::DataPoint(boxed_data))?;
         }
     }
 }
 
 fn wait_for_session(producer: &mut impl TelemetryProducer) -> Result<(), OcypodeError> {
+    use log::{info, warn};
+
     // wait for a session to start
     let session_wait_start = SystemTime::now();
+    let mut last_log_time = SystemTime::now();
+    let mut retry_count = 0;
+
     loop {
         if producer.session_info().is_err() {
+            retry_count += 1;
             thread::sleep(Duration::from_millis(REFRESH_RATE_MS));
+
+            // Log every 5 seconds
+            if SystemTime::now()
+                .duration_since(last_log_time)
+                .unwrap()
+                .as_secs()
+                >= 5
+            {
+                let elapsed = SystemTime::now()
+                    .duration_since(session_wait_start)
+                    .unwrap()
+                    .as_secs();
+                info!(
+                    "Still waiting for active session... ({} seconds elapsed, {} retries)",
+                    elapsed, retry_count
+                );
+                last_log_time = SystemTime::now();
+            }
         } else {
+            info!("Active session found after {} retries!", retry_count);
             break;
         }
-        if SystemTime::now()
+
+        let elapsed_secs = SystemTime::now()
             .duration_since(session_wait_start)
             .unwrap()
-            .as_secs()
-            > CONN_RETRY_MAX_WAIT_S
-        {
+            .as_secs();
+
+        if elapsed_secs > CONN_RETRY_MAX_WAIT_S {
+            warn!("Timeout waiting for session after {} seconds", elapsed_secs);
             return Err(OcypodeError::IRacingConnectionTimeout);
         }
     }

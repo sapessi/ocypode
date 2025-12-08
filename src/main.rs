@@ -1,18 +1,14 @@
+mod errors;
+mod setup_assistant;
 mod telemetry;
 mod ui;
 mod writer;
 
-use std::{
-    io,
-    path::PathBuf,
-    sync::mpsc::{self, SendError},
-    thread,
-};
+use std::{path::PathBuf, sync::mpsc, thread};
 
 use clap::{Parser, Subcommand, ValueEnum, arg};
 use egui::Vec2;
-use snafu::Snafu;
-use telemetry::TelemetryOutput;
+use errors::OcypodeError;
 #[cfg(windows)]
 use telemetry::producer::{ACCTelemetryProducer, IRacingTelemetryProducer};
 use ui::analysis::TelemetryAnalysisApp;
@@ -27,59 +23,7 @@ enum GameSource {
     ACC,
 }
 
-#[derive(Debug, Snafu)]
-enum OcypodeError {
-    // Errors for the iRacing client
-    #[snafu(display("Unable to find iRacing session"))]
-    NoIRacingFile { source: io::Error },
-    #[snafu(display("Timeout waiting for iRacing session"))]
-    IRacingConnectionTimeout,
-
-    // Errors for the ACC client
-    #[snafu(display("Timeout waiting for ACC session"))]
-    #[allow(dead_code)]
-    ACCConnectionTimeout,
-
-    // Errors while reading and broadcasting telemetry data
-    #[snafu(display("Missing iRacing client, session not initialized"))]
-    MissingIRacingSession,
-    #[snafu(display("Telemetry point producer error"))]
-    TelemetryProducerError { description: String },
-    #[snafu(display("Error broadcasting telemetry data point"))]
-    TelemetryBroadcastError {
-        source: Box<SendError<TelemetryOutput>>,
-    },
-
-    // Errors for the telemetry writer
-    #[snafu(display("Error writing telemetry file"))]
-    WriterError { source: io::Error },
-
-    // Config managaement errors
-    #[snafu(display("Could not find application data directory to save config file"))]
-    NoConfigDir,
-    #[snafu(display("Error writing config file"))]
-    ConfigIOError { source: io::Error },
-    #[snafu(display("Error serializing config file"))]
-    ConfigSerializeError { source: serde_json::Error },
-
-    // UI errors
-    #[snafu(display("Invalid telemetry file: {path}"))]
-    InvalidTelemetryFile { path: String },
-    #[snafu(display("Error loading telemetry file"))]
-    TelemetryLoaderError { source: io::Error },
-    #[snafu(display(
-        "Legacy telemetry file format detected. This file was created with an older version of Ocypode and is not compatible with the current version. Please re-record your session with the current version."
-    ))]
-    LegacyTelemetryFormat,
-}
-
-impl From<SendError<TelemetryOutput>> for OcypodeError {
-    fn from(value: SendError<TelemetryOutput>) -> Self {
-        OcypodeError::TelemetryBroadcastError {
-            source: Box::new(value),
-        }
-    }
-}
+// OcypodeError is now defined in errors.rs
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -119,6 +63,10 @@ fn live(window_size: usize, output: Option<PathBuf>, game: GameSource) -> Result
 
     #[cfg(windows)]
     {
+        println!("Starting telemetry collection for {:?}...", game);
+        println!("Waiting for game connection (this may take up to 10 minutes)...");
+        println!("Make sure you're in an active session (on track, not in menus)");
+
         let (telemtry_tx, telemetry_rx) = mpsc::channel::<telemetry::TelemetryOutput>();
 
         // if we need to write an output file we create a new channel and have the telemetry reader send to both the plotting
@@ -129,7 +77,7 @@ fn live(window_size: usize, output: Option<PathBuf>, game: GameSource) -> Result
 
             thread::spawn(move || {
                 // Instantiate the correct producer based on the game parameter
-                match game {
+                let result = match game {
                     GameSource::IRacing => {
                         let telemetry_producer = IRacingTelemetryProducer::default();
                         telemetry::collect_telemetry(
@@ -137,7 +85,6 @@ fn live(window_size: usize, output: Option<PathBuf>, game: GameSource) -> Result
                             telemtry_tx,
                             Some(telemetry_writer_tx),
                         )
-                        .expect("Error while reading telemetry");
                     }
                     GameSource::ACC => {
                         let telemetry_producer = ACCTelemetryProducer::default();
@@ -146,7 +93,18 @@ fn live(window_size: usize, output: Option<PathBuf>, game: GameSource) -> Result
                             telemtry_tx,
                             Some(telemetry_writer_tx),
                         )
-                        .expect("Error while reading telemetry");
+                    }
+                };
+
+                if let Err(e) = result {
+                    // Only log the error if it's not a SendError (which happens when UI closes)
+                    match e {
+                        OcypodeError::TelemetryBroadcastError { .. } => {
+                            // UI closed, this is expected - exit gracefully
+                        }
+                        _ => {
+                            eprintln!("Error while reading telemetry: {:?}", e);
+                        }
                     }
                 }
             });
@@ -154,16 +112,26 @@ fn live(window_size: usize, output: Option<PathBuf>, game: GameSource) -> Result
         } else {
             thread::spawn(move || {
                 // Instantiate the correct producer based on the game parameter
-                match game {
+                let result = match game {
                     GameSource::IRacing => {
                         let telemetry_producer = IRacingTelemetryProducer::default();
                         telemetry::collect_telemetry(telemetry_producer, telemtry_tx, None)
-                            .expect("Error while reading telemetry");
                     }
                     GameSource::ACC => {
                         let telemetry_producer = ACCTelemetryProducer::default();
                         telemetry::collect_telemetry(telemetry_producer, telemtry_tx, None)
-                            .expect("Error while reading telemetry");
+                    }
+                };
+
+                if let Err(e) = result {
+                    // Only log the error if it's not a SendError (which happens when UI closes)
+                    match e {
+                        OcypodeError::TelemetryBroadcastError { .. } => {
+                            // UI closed, this is expected - exit gracefully
+                        }
+                        _ => {
+                            eprintln!("Error while reading telemetry: {:?}", e);
+                        }
                     }
                 }
             });
@@ -217,7 +185,7 @@ fn load(input: &PathBuf) -> Result<(), OcypodeError> {
 }
 
 fn main() {
-    #[cfg(debug_assertions)]
+    // Always initialize logging, not just in debug mode
     colog::init();
 
     let cli = Args::parse();

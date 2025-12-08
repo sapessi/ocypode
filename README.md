@@ -14,7 +14,7 @@ Ocypode supports telemetry from multiple racing simulations:
 Additional games can be added through the [simetry](https://github.com/adnanademovic/simetry) library.
 
 ## Why Ocypode
-There are lots of telemetry overlays out there. However, I couldn't find one that **(1) gave you a real-time, intuitive view of your driving errors, and (2) didn't require some sort of paid subscription.**
+There are lots of telemetry overlays out there. However, I couldn't find one that **(1) gave you a real-time, intuitive view of your driving errors, (2) provided intelligent setup recommendations, and (3) didn't require some sort of paid subscription.**
 
 ### Real-time alerts 
 Traditional telemetry tools require that you save telemetry data and then dive deep to find out what you did wrong and when. Analyzing telemetry data is time-consuming and requires a lot of expertise.
@@ -24,6 +24,13 @@ Ocypode analyzes telemetry data in real-time to show intuitive alerts for excess
 Ocypode can also save and visualize telemetry data showing the driving alerts it generated.
 
 ![Load saved telemetry with alerts](/screenshots/telemetry_analysis_basic.png)
+
+### Setup Assistant
+The Setup Assistant takes telemetry analysis a step further by automatically detecting handling issues and providing specific car setup recommendations. It monitors your driving in real-time, identifies problems like understeer, oversteer, brake locking, and tire temperature issues, then suggests precise setup changes based on proven methodology.
+
+You confirm the issues you actually feel in the car, and the Setup Assistant provides targeted recommendations organized by category (aero, suspension, brakes, etc.). This bridges the gap between raw telemetry data and actionable setup improvements, helping you optimize your car without needing deep setup expertise.
+
+For detailed information, see the [Setup Assistant User Guide](docs/SETUP_ASSISTANT.md).
 
 ### Free and open source
 I want Ocypode to remain a free, open-source tool
@@ -149,6 +156,17 @@ Version 0.2.0 introduced multi-game support and the `SerializableTelemetry` form
 ## Status
 The real-time view with basic telemetry and alerts is working. The offline analysis portion is lower priority for a first release. I have created [a project](https://github.com/users/sapessi/projects/1/views/1) to track the first official release.
 
+## Documentation
+
+### User Guides
+- **[Setup Assistant User Guide](docs/SETUP_ASSISTANT.md)** - Complete guide to using the Setup Assistant feature
+- **[Telemetry File Format](docs/TELEMETRY_FILE_FORMAT.md)** - Specification of the telemetry data format
+
+### Technical Documentation
+- **[Analyzer Configuration](docs/ANALYZER_CONFIGURATION.md)** - Detailed analyzer thresholds and configuration
+- **[Performance Guide](docs/PERFORMANCE.md)** - Performance optimization and benchmarking
+- **[ACC Setup Guide](docs/ACC_SETUP_GUIDE.md)** - Setup methodology reference
+
 ## Telemetry File Format
 
 Ocypode saves telemetry data in JSON Lines format (`.jsonl`). Each line contains either:
@@ -167,7 +185,7 @@ The `TelemetryData` structure uses explicit unit suffixes in field names for cla
 
 The `game_source` field is always present to identify which racing simulation the data came from. Some fields are game-specific (e.g., GPS coordinates are only available from iRacing).
 
-For complete format specification, see [TELEMETRY_FILE_FORMAT.md](TELEMETRY_FILE_FORMAT.md).
+For complete format specification, see [docs/TELEMETRY_FILE_FORMAT.md](docs/TELEMETRY_FILE_FORMAT.md).
 
 ## Development
 

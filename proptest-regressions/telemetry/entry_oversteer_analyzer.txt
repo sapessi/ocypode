@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 1c95bf20d38676d22cb90beaea920710d4c091117644839bd3edec34128ac5c4 # shrinks to baseline_brake = 0.31, baseline_steering = 0.11, baseline_yaw_ratio = 0.3, oversteer_multiplier = 1.6
