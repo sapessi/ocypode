@@ -225,15 +225,14 @@ impl LiveTelemetryApp {
     /// - Shows parameter name, adjustment direction, and description
     /// - Supports displaying multiple recommendation sets
     /// - Updates in real-time as confirmation state changes
+    /// - Prioritizes recommendations by impact
+    /// - Highlights conflicting recommendations
     fn show_recommendations(&self, ui: &mut egui::Ui) {
-        use std::collections::HashMap;
-
-        // Get all recommendations for confirmed findings
-        // This updates in real-time as the user confirms/unconfirms findings
-        let all_recommendations = self.setup_assistant.get_recommendations();
+        // Get processed recommendations with priority and conflict detection
+        let processed_recommendations = self.setup_assistant.get_processed_recommendations();
 
         // If no confirmed findings, show a message
-        if all_recommendations.is_empty() {
+        if processed_recommendations.is_empty() {
             ui.add_space(15.0);
             ui.vertical_centered(|ui| {
                 ui.label(
@@ -248,63 +247,107 @@ impl LiveTelemetryApp {
         ui.add_space(5.0);
         ui.heading("Setup Recommendations");
         ui.add_space(8.0);
-        ui.label(
-            egui::RichText::new("Based on confirmed issues")
-                .size(12.0)
-                .color(egui::Color32::GRAY),
-        );
+
+        // Show priority info
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new("Sorted by priority • ")
+                    .size(12.0)
+                    .color(egui::Color32::GRAY),
+            );
+            ui.label(
+                egui::RichText::new("⚠️ = Conflicting recommendations")
+                    .size(12.0)
+                    .color(egui::Color32::from_rgb(255, 200, 100)),
+            );
+        });
         ui.add_space(12.0);
 
-        // Group recommendations by category
-        let mut by_category: HashMap<String, Vec<&crate::setup_assistant::SetupRecommendation>> =
-            HashMap::new();
+        // Display recommendations in priority order (already sorted by process_recommendations)
+        for proc_rec in &processed_recommendations {
+            let rec = &proc_rec.recommendation;
 
-        for rec in &all_recommendations {
-            let category_key = format!("{}", rec.category);
-            by_category.entry(category_key).or_default().push(rec);
-        }
+            // Priority badge, category, parameter, and adjustment on one line
+            ui.horizontal(|ui| {
+                // Priority badge with color coding
+                let priority_color = match rec.priority {
+                    5 => egui::Color32::from_rgb(255, 100, 100), // Red - highest priority
+                    4 => egui::Color32::from_rgb(255, 165, 0),   // Orange
+                    3 => egui::Color32::from_rgb(255, 215, 0),   // Yellow
+                    2 => egui::Color32::from_rgb(144, 238, 144), // Light green
+                    _ => egui::Color32::GRAY,                    // Gray - lowest
+                };
 
-        // Sort categories for consistent display
-        let mut categories: Vec<_> = by_category.keys().cloned().collect();
-        categories.sort();
+                ui.label(
+                    egui::RichText::new(format!("P{}", rec.priority))
+                        .small()
+                        .strong()
+                        .color(priority_color),
+                );
 
-        // Display recommendations grouped by category with improved layout
-        for category in categories {
-            if let Some(recs) = by_category.get(&category) {
-                // Category header with visual emphasis
-                ui.label(egui::RichText::new(&category).strong().size(14.0));
-                ui.add_space(6.0);
-
-                // Display each recommendation in this category
-                for rec in recs {
-                    // Parameter and adjustment on one line with improved styling
-                    ui.horizontal(|ui| {
-                        ui.label("•");
-                        ui.label(
-                            egui::RichText::new(&rec.parameter)
-                                .strong()
-                                .color(egui::Color32::from_rgb(242, 97, 63)),
-                        );
-                        ui.label("-");
-                        ui.label(egui::RichText::new(&rec.adjustment).color(egui::Color32::WHITE));
-                    });
-
-                    // Description indented below with improved readability
-                    ui.horizontal(|ui| {
-                        ui.add_space(15.0);
-                        ui.label(
-                            egui::RichText::new(&rec.description)
-                                .italics()
-                                .size(12.0)
-                                .color(egui::Color32::GRAY),
-                        );
-                    });
-
-                    ui.add_space(4.0);
+                // Conflict indicator
+                if proc_rec.has_conflict {
+                    ui.label(
+                        egui::RichText::new("⚠️").color(egui::Color32::from_rgb(255, 200, 100)),
+                    );
+                } else {
+                    ui.label("•");
                 }
 
-                ui.add_space(10.0);
+                // Category badge (small, subtle)
+                ui.label(
+                    egui::RichText::new(format!("[{}]", rec.category))
+                        .small()
+                        .color(egui::Color32::DARK_GRAY),
+                );
+
+                ui.label(
+                    egui::RichText::new(&rec.parameter)
+                        .strong()
+                        .color(egui::Color32::from_rgb(242, 97, 63)),
+                );
+                ui.label("-");
+                ui.label(egui::RichText::new(&rec.adjustment).color(egui::Color32::WHITE));
+            });
+
+            // Description indented below with improved readability
+            ui.horizontal(|ui| {
+                ui.add_space(15.0);
+                ui.label(
+                    egui::RichText::new(&rec.description)
+                        .italics()
+                        .size(12.0)
+                        .color(egui::Color32::GRAY),
+                );
+            });
+
+            // Show conflict details if present
+            if proc_rec.has_conflict && !proc_rec.conflicts.is_empty() {
+                ui.horizontal(|ui| {
+                    ui.add_space(15.0);
+                    ui.label(
+                        egui::RichText::new("⚠️ Conflicts with: ")
+                            .size(11.0)
+                            .color(egui::Color32::from_rgb(255, 200, 100)),
+                    );
+
+                    let conflict_text = proc_rec
+                        .conflicts
+                        .iter()
+                        .map(|c| format!("{} ({})", c.parameter, c.adjustment))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+
+                    ui.label(
+                        egui::RichText::new(conflict_text)
+                            .size(11.0)
+                            .italics()
+                            .color(egui::Color32::from_rgb(255, 200, 100)),
+                    );
+                });
             }
+
+            ui.add_space(6.0);
         }
     }
 }

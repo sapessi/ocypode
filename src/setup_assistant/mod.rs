@@ -5,6 +5,9 @@ use crate::telemetry::TelemetryData;
 pub mod recommendations;
 pub use recommendations::{RecommendationEngine, SetupRecommendation};
 
+#[cfg(test)]
+mod recommendation_tests;
+
 /// Types of handling issues that can be detected during a session.
 ///
 /// Each finding type corresponds to a specific driving issue that can be
@@ -444,6 +447,23 @@ impl SetupAssistant {
         }
 
         all_recommendations
+    }
+
+    /// Get processed and prioritized recommendations for all confirmed findings.
+    ///
+    /// Returns recommendations sorted by priority with conflict detection.
+    /// Conflicting recommendations (e.g., "stiffen" vs "soften" same parameter)
+    /// are identified and marked for user awareness.
+    ///
+    /// # Returns
+    /// Vector of processed recommendations with:
+    /// - Sorted by priority (highest first)
+    /// - Conflicts detected and marked
+    /// - Duplicate adjustments consolidated
+    pub fn get_processed_recommendations(&self) -> Vec<recommendations::ProcessedRecommendation> {
+        let raw_recommendations = self.get_recommendations();
+        self.recommendation_engine
+            .process_recommendations(raw_recommendations)
     }
 
     /// Clear all findings and state for a new session.

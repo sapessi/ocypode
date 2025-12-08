@@ -37,7 +37,7 @@ impl std::fmt::Display for SetupCategory {
         match self {
             SetupCategory::Aerodynamics => write!(f, "Aero"),
             SetupCategory::Suspension => write!(f, "Suspension"),
-            SetupCategory::AntiRollBar => write!(f, "ARB"),
+            SetupCategory::AntiRollBar => write!(f, "Antirollbar"),
             SetupCategory::Dampers => write!(f, "Dampers"),
             SetupCategory::Brakes => write!(f, "Brakes"),
             SetupCategory::Drivetrain => write!(f, "Drivetrain"),
@@ -68,6 +68,19 @@ pub struct SetupRecommendation {
     pub adjustment: String,
     /// Explanation of why this adjustment helps
     pub description: String,
+    /// Priority level (1-5, where 5 is highest priority)
+    pub priority: u8,
+}
+
+/// A processed recommendation with conflict information.
+#[derive(Debug, Clone)]
+pub struct ProcessedRecommendation {
+    /// The original recommendation
+    pub recommendation: SetupRecommendation,
+    /// Conflicting recommendations (if any)
+    pub conflicts: Vec<SetupRecommendation>,
+    /// Whether this recommendation conflicts with others
+    pub has_conflict: bool,
 }
 
 /// Engine that maps findings to setup recommendations.
@@ -120,41 +133,13 @@ impl RecommendationEngine {
             FindingType::CornerEntryUndersteer,
             vec![
                 SetupRecommendation {
-                    category: SetupCategory::Aerodynamics,
-                    parameter: "Front Ride Height".to_string(),
-                    adjustment: "Reduce".to_string(),
-                    description: "Lowering front ride height increases front downforce and grip"
-                        .to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Aerodynamics,
-                    parameter: "Rear Ride Height".to_string(),
-                    adjustment: "Increase".to_string(),
-                    description:
-                        "Raising rear ride height reduces rear downforce, shifting balance forward"
-                            .to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Suspension,
-                    parameter: "Front Springs".to_string(),
-                    adjustment: "Soften".to_string(),
-                    description: "Softer front springs improve mechanical grip during turn-in"
-                        .to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Suspension,
-                    parameter: "Rear Springs".to_string(),
-                    adjustment: "Stiffen".to_string(),
-                    description: "Stiffer rear springs reduce rear grip, shifting balance forward"
-                        .to_string(),
-                },
-                SetupRecommendation {
                     category: SetupCategory::AntiRollBar,
-                    parameter: "Front ARB".to_string(),
+                    parameter: "Front Antirollbar".to_string(),
                     adjustment: "Soften".to_string(),
                     description:
                         "Softer front anti-roll bar allows more front grip during corner entry"
                             .to_string(),
+                    priority: 5, // Highest impact, easy to adjust
                 },
                 SetupRecommendation {
                     category: SetupCategory::Brakes,
@@ -163,12 +148,40 @@ impl RecommendationEngine {
                     description:
                         "Moving brake bias rearward reduces front tire load during braking"
                             .to_string(),
+                    priority: 4, // High impact, easy to adjust
                 },
                 SetupRecommendation {
-                    category: SetupCategory::Alignment,
-                    parameter: "Front Toe".to_string(),
-                    adjustment: "Increase Toe Out".to_string(),
-                    description: "Toe out improves turn-in response and front grip".to_string(),
+                    category: SetupCategory::Suspension,
+                    parameter: "Front Springs".to_string(),
+                    adjustment: "Soften".to_string(),
+                    description: "Softer front springs improve mechanical grip during turn-in"
+                        .to_string(),
+                    priority: 4, // High impact
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Aerodynamics,
+                    parameter: "Front Ride Height".to_string(),
+                    adjustment: "Reduce".to_string(),
+                    description: "Lowering front ride height increases front downforce and grip"
+                        .to_string(),
+                    priority: 3, // Medium impact, affects other parameters
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Suspension,
+                    parameter: "Rear Springs".to_string(),
+                    adjustment: "Stiffen".to_string(),
+                    description: "Stiffer rear springs reduce rear grip, shifting balance forward"
+                        .to_string(),
+                    priority: 3, // Medium impact
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Aerodynamics,
+                    parameter: "Rear Ride Height".to_string(),
+                    adjustment: "Increase".to_string(),
+                    description:
+                        "Raising rear ride height reduces rear downforce, shifting balance forward"
+                            .to_string(),
+                    priority: 3, // Medium impact
                 },
                 SetupRecommendation {
                     category: SetupCategory::Dampers,
@@ -176,6 +189,7 @@ impl RecommendationEngine {
                     adjustment: "Soften".to_string(),
                     description: "Softer front bump damping allows weight transfer to front tires"
                         .to_string(),
+                    priority: 2, // Lower impact, more complex
                 },
                 SetupRecommendation {
                     category: SetupCategory::Dampers,
@@ -183,6 +197,14 @@ impl RecommendationEngine {
                     adjustment: "Stiffen".to_string(),
                     description: "Stiffer rear rebound keeps weight on front tires longer"
                         .to_string(),
+                    priority: 2, // Lower impact, more complex
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Alignment,
+                    parameter: "Front Toe".to_string(),
+                    adjustment: "Increase Toe Out".to_string(),
+                    description: "Toe out improves turn-in response and front grip".to_string(),
+                    priority: 2, // Lower priority, affects tire wear
                 },
             ],
         );
@@ -192,43 +214,12 @@ impl RecommendationEngine {
             FindingType::CornerEntryOversteer,
             vec![
                 SetupRecommendation {
-                    category: SetupCategory::Aerodynamics,
-                    parameter: "Front Ride Height".to_string(),
-                    adjustment: "Increase".to_string(),
-                    description: "Raising front ride height reduces front downforce".to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Aerodynamics,
-                    parameter: "Rear Ride Height".to_string(),
-                    adjustment: "Reduce".to_string(),
-                    description: "Lowering rear ride height increases rear downforce and stability"
-                        .to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Suspension,
-                    parameter: "Front Springs".to_string(),
-                    adjustment: "Stiffen".to_string(),
-                    description: "Stiffer front springs reduce front grip during turn-in"
-                        .to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Suspension,
-                    parameter: "Rear Springs".to_string(),
-                    adjustment: "Soften".to_string(),
-                    description: "Softer rear springs improve rear mechanical grip".to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::AntiRollBar,
-                    parameter: "Front ARB".to_string(),
-                    adjustment: "Stiffen".to_string(),
-                    description: "Stiffer front anti-roll bar reduces front grip".to_string(),
-                },
-                SetupRecommendation {
                     category: SetupCategory::Brakes,
                     parameter: "Brake Bias".to_string(),
                     adjustment: "Move Forward".to_string(),
                     description: "Moving brake bias forward increases rear stability under braking"
                         .to_string(),
+                    priority: 5, // Highest impact, easy to adjust
                 },
                 SetupRecommendation {
                     category: SetupCategory::Drivetrain,
@@ -236,18 +227,58 @@ impl RecommendationEngine {
                     adjustment: "Increase".to_string(),
                     description: "Higher preload locks differential on coast, stabilizing rear"
                         .to_string(),
+                    priority: 4, // High impact
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Suspension,
+                    parameter: "Rear Springs".to_string(),
+                    adjustment: "Soften".to_string(),
+                    description: "Softer rear springs improve rear mechanical grip".to_string(),
+                    priority: 4, // High impact
+                },
+                SetupRecommendation {
+                    category: SetupCategory::AntiRollBar,
+                    parameter: "Front Antirollbar".to_string(),
+                    adjustment: "Stiffen".to_string(),
+                    description: "Stiffer front anti-roll bar reduces front grip".to_string(),
+                    priority: 3, // Medium impact
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Aerodynamics,
+                    parameter: "Rear Ride Height".to_string(),
+                    adjustment: "Reduce".to_string(),
+                    description: "Lowering rear ride height increases rear downforce and stability"
+                        .to_string(),
+                    priority: 3, // Medium impact
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Suspension,
+                    parameter: "Front Springs".to_string(),
+                    adjustment: "Stiffen".to_string(),
+                    description: "Stiffer front springs reduce front grip during turn-in"
+                        .to_string(),
+                    priority: 3, // Medium impact
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Aerodynamics,
+                    parameter: "Front Ride Height".to_string(),
+                    adjustment: "Increase".to_string(),
+                    description: "Raising front ride height reduces front downforce".to_string(),
+                    priority: 2, // Lower priority
                 },
                 SetupRecommendation {
                     category: SetupCategory::Dampers,
                     parameter: "Front Bump".to_string(),
                     adjustment: "Stiffen".to_string(),
                     description: "Stiffer front bump reduces weight transfer to front".to_string(),
+                    priority: 2, // Lower impact
                 },
                 SetupRecommendation {
                     category: SetupCategory::Dampers,
                     parameter: "Rear Rebound".to_string(),
                     adjustment: "Soften".to_string(),
                     description: "Softer rear rebound allows rear to settle faster".to_string(),
+                    priority: 2, // Lower impact
                 },
             ],
         );
@@ -261,13 +292,7 @@ impl RecommendationEngine {
                     parameter: "Brake Bias".to_string(),
                     adjustment: "Move Forward".to_string(),
                     description: "Forward brake bias stabilizes the rear under braking".to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Suspension,
-                    parameter: "Front Springs".to_string(),
-                    adjustment: "Stiffen".to_string(),
-                    description: "Stiffer front springs reduce pitch and improve stability"
-                        .to_string(),
+                    priority: 5,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Drivetrain,
@@ -275,6 +300,15 @@ impl RecommendationEngine {
                     adjustment: "Increase".to_string(),
                     description: "Higher preload provides more predictable rear behavior"
                         .to_string(),
+                    priority: 4,
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Suspension,
+                    parameter: "Front Springs".to_string(),
+                    adjustment: "Stiffen".to_string(),
+                    description: "Stiffer front springs reduce pitch and improve stability"
+                        .to_string(),
+                    priority: 4,
                 },
             ],
         );
@@ -284,41 +318,49 @@ impl RecommendationEngine {
             FindingType::MidCornerUndersteer,
             vec![
                 SetupRecommendation {
-                    category: SetupCategory::Aerodynamics,
-                    parameter: "Front Wing".to_string(),
-                    adjustment: "Increase".to_string(),
-                    description: "More front wing increases front downforce at apex".to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Aerodynamics,
-                    parameter: "Splitter".to_string(),
-                    adjustment: "Increase".to_string(),
-                    description: "More splitter increases front downforce".to_string(),
-                },
-                SetupRecommendation {
                     category: SetupCategory::AntiRollBar,
-                    parameter: "Front ARB".to_string(),
+                    parameter: "Front Antirollbar".to_string(),
                     adjustment: "Soften".to_string(),
-                    description: "Softer front ARB allows more front grip mid-corner".to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::AntiRollBar,
-                    parameter: "Rear ARB".to_string(),
-                    adjustment: "Stiffen".to_string(),
-                    description: "Stiffer rear ARB reduces rear grip, shifting balance forward"
+                    description: "Softer front Antirollbar allows more front grip mid-corner"
                         .to_string(),
+                    priority: 5,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Suspension,
                     parameter: "Front Springs".to_string(),
                     adjustment: "Soften".to_string(),
                     description: "Softer front springs improve mechanical grip".to_string(),
+                    priority: 4,
+                },
+                SetupRecommendation {
+                    category: SetupCategory::AntiRollBar,
+                    parameter: "Rear Antirollbar".to_string(),
+                    adjustment: "Stiffen".to_string(),
+                    description:
+                        "Stiffer rear Antirollbar reduces rear grip, shifting balance forward"
+                            .to_string(),
+                    priority: 4,
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Aerodynamics,
+                    parameter: "Front Wing".to_string(),
+                    adjustment: "Increase".to_string(),
+                    description: "More front wing increases front downforce at apex".to_string(),
+                    priority: 3,
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Aerodynamics,
+                    parameter: "Splitter".to_string(),
+                    adjustment: "Increase".to_string(),
+                    description: "More splitter increases front downforce".to_string(),
+                    priority: 3,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Suspension,
                     parameter: "Rear Springs".to_string(),
                     adjustment: "Stiffen".to_string(),
                     description: "Stiffer rear springs reduce rear grip".to_string(),
+                    priority: 3,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Alignment,
@@ -327,6 +369,7 @@ impl RecommendationEngine {
                     description:
                         "More negative camber improves front tire contact patch mid-corner"
                             .to_string(),
+                    priority: 3,
                 },
             ],
         );
@@ -336,35 +379,41 @@ impl RecommendationEngine {
             FindingType::MidCornerOversteer,
             vec![
                 SetupRecommendation {
-                    category: SetupCategory::Aerodynamics,
-                    parameter: "Rear Wing".to_string(),
-                    adjustment: "Increase".to_string(),
-                    description: "More rear wing increases rear downforce and stability"
-                        .to_string(),
-                },
-                SetupRecommendation {
                     category: SetupCategory::AntiRollBar,
-                    parameter: "Front ARB".to_string(),
-                    adjustment: "Stiffen".to_string(),
-                    description: "Stiffer front ARB reduces front grip".to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::AntiRollBar,
-                    parameter: "Rear ARB".to_string(),
+                    parameter: "Rear Antirollbar".to_string(),
                     adjustment: "Soften".to_string(),
-                    description: "Softer rear ARB allows more rear grip mid-corner".to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Suspension,
-                    parameter: "Front Springs".to_string(),
-                    adjustment: "Stiffen".to_string(),
-                    description: "Stiffer front springs reduce front grip".to_string(),
+                    description: "Softer rear Antirollbar allows more rear grip mid-corner"
+                        .to_string(),
+                    priority: 5,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Suspension,
                     parameter: "Rear Springs".to_string(),
                     adjustment: "Soften".to_string(),
                     description: "Softer rear springs improve rear mechanical grip".to_string(),
+                    priority: 4,
+                },
+                SetupRecommendation {
+                    category: SetupCategory::AntiRollBar,
+                    parameter: "Front Antirollbar".to_string(),
+                    adjustment: "Stiffen".to_string(),
+                    description: "Stiffer front Antirollbar reduces front grip".to_string(),
+                    priority: 4,
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Aerodynamics,
+                    parameter: "Rear Wing".to_string(),
+                    adjustment: "Increase".to_string(),
+                    description: "More rear wing increases rear downforce and stability"
+                        .to_string(),
+                    priority: 3,
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Suspension,
+                    parameter: "Front Springs".to_string(),
+                    adjustment: "Stiffen".to_string(),
+                    description: "Stiffer front springs reduce front grip".to_string(),
+                    priority: 3,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Alignment,
@@ -372,6 +421,7 @@ impl RecommendationEngine {
                     adjustment: "Increase Negative".to_string(),
                     description: "More negative camber improves rear tire contact patch"
                         .to_string(),
+                    priority: 3,
                 },
             ],
         );
@@ -385,18 +435,21 @@ impl RecommendationEngine {
                     parameter: "Differential Preload".to_string(),
                     adjustment: "Increase".to_string(),
                     description: "Higher preload helps rotate the car on power".to_string(),
+                    priority: 5,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Drivetrain,
                     parameter: "Differential Locking".to_string(),
                     adjustment: "Increase".to_string(),
                     description: "More locking helps transfer power and rotate the car".to_string(),
+                    priority: 4,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Suspension,
                     parameter: "Front Springs".to_string(),
                     adjustment: "Soften".to_string(),
                     description: "Softer front springs improve front grip on exit".to_string(),
+                    priority: 4,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Suspension,
@@ -404,6 +457,7 @@ impl RecommendationEngine {
                     adjustment: "Stiffen".to_string(),
                     description: "Stiffer rear springs reduce rear grip, helping rotation"
                         .to_string(),
+                    priority: 3,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Dampers,
@@ -411,6 +465,7 @@ impl RecommendationEngine {
                     adjustment: "Stiffen".to_string(),
                     description: "Stiffer rear slow bump reduces rear squat on acceleration"
                         .to_string(),
+                    priority: 2,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Dampers,
@@ -418,6 +473,7 @@ impl RecommendationEngine {
                     adjustment: "Soften".to_string(),
                     description: "Softer front slow rebound allows front to settle faster"
                         .to_string(),
+                    priority: 2,
                 },
             ],
         );
@@ -427,11 +483,19 @@ impl RecommendationEngine {
             FindingType::CornerExitPowerOversteer,
             vec![
                 SetupRecommendation {
+                    category: SetupCategory::Electronics,
+                    parameter: "Traction Control".to_string(),
+                    adjustment: "Increase".to_string(),
+                    description: "Higher TC cuts power to prevent wheelspin".to_string(),
+                    priority: 5,
+                },
+                SetupRecommendation {
                     category: SetupCategory::Drivetrain,
                     parameter: "Differential Preload".to_string(),
                     adjustment: "Reduce".to_string(),
                     description: "Lower preload allows more rear slip, reducing wheelspin"
                         .to_string(),
+                    priority: 4,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Drivetrain,
@@ -440,25 +504,14 @@ impl RecommendationEngine {
                     description:
                         "Less locking allows wheels to spin independently, improving traction"
                             .to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Electronics,
-                    parameter: "Traction Control".to_string(),
-                    adjustment: "Increase".to_string(),
-                    description: "Higher TC cuts power to prevent wheelspin".to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Suspension,
-                    parameter: "Front Springs".to_string(),
-                    adjustment: "Stiffen".to_string(),
-                    description: "Stiffer front springs reduce front grip, stabilizing rear"
-                        .to_string(),
+                    priority: 4,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Suspension,
                     parameter: "Rear Springs".to_string(),
                     adjustment: "Soften".to_string(),
                     description: "Softer rear springs improve rear mechanical grip".to_string(),
+                    priority: 4,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Aerodynamics,
@@ -466,12 +519,22 @@ impl RecommendationEngine {
                     adjustment: "Increase".to_string(),
                     description: "More rear wing increases rear downforce at high speeds"
                         .to_string(),
+                    priority: 3,
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Suspension,
+                    parameter: "Front Springs".to_string(),
+                    adjustment: "Stiffen".to_string(),
+                    description: "Stiffer front springs reduce front grip, stabilizing rear"
+                        .to_string(),
+                    priority: 3,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Dampers,
                     parameter: "Rear Slow Bump".to_string(),
                     adjustment: "Soften".to_string(),
                     description: "Softer rear slow bump allows rear to settle and grip".to_string(),
+                    priority: 2,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Dampers,
@@ -479,6 +542,7 @@ impl RecommendationEngine {
                     adjustment: "Stiffen".to_string(),
                     description: "Stiffer front slow rebound keeps weight on rear tires"
                         .to_string(),
+                    priority: 2,
                 },
             ],
         );
@@ -488,22 +552,25 @@ impl RecommendationEngine {
             FindingType::CornerExitSnapOversteer,
             vec![
                 SetupRecommendation {
+                    category: SetupCategory::AntiRollBar,
+                    parameter: "Rear Antirollbar".to_string(),
+                    adjustment: "Soften".to_string(),
+                    description: "Softer rear Antirollbar allows more rear compliance".to_string(),
+                    priority: 5,
+                },
+                SetupRecommendation {
                     category: SetupCategory::Suspension,
                     parameter: "Rear Springs".to_string(),
                     adjustment: "Soften".to_string(),
                     description: "Softer rear springs prevent sudden rear grip loss".to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::AntiRollBar,
-                    parameter: "Rear ARB".to_string(),
-                    adjustment: "Soften".to_string(),
-                    description: "Softer rear ARB allows more rear compliance".to_string(),
+                    priority: 4,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Dampers,
                     parameter: "Rear Fast Bump".to_string(),
                     adjustment: "Soften".to_string(),
                     description: "Softer rear fast bump prevents sudden compression".to_string(),
+                    priority: 2,
                 },
             ],
         );
@@ -517,12 +584,14 @@ impl RecommendationEngine {
                     parameter: "Brake Bias".to_string(),
                     adjustment: "Move Rearward".to_string(),
                     description: "Moving brake bias rearward reduces front brake force".to_string(),
+                    priority: 5,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Brakes,
                     parameter: "Brake Pressure".to_string(),
                     adjustment: "Reduce".to_string(),
                     description: "Lower brake pressure reduces overall braking force".to_string(),
+                    priority: 4,
                 },
             ],
         );
@@ -535,6 +604,7 @@ impl RecommendationEngine {
                 parameter: "Brake Bias".to_string(),
                 adjustment: "Move Forward".to_string(),
                 description: "Moving brake bias forward reduces rear brake force".to_string(),
+                priority: 5,
             }],
         );
 
@@ -543,17 +613,19 @@ impl RecommendationEngine {
             FindingType::BrakingInstability,
             vec![
                 SetupRecommendation {
+                    category: SetupCategory::Suspension,
+                    parameter: "Front Springs".to_string(),
+                    adjustment: "Stiffen".to_string(),
+                    description: "Stiffer front springs reduce brake dive".to_string(),
+                    priority: 4,
+                },
+                SetupRecommendation {
                     category: SetupCategory::Aerodynamics,
                     parameter: "Rear Ride Height".to_string(),
                     adjustment: "Reduce".to_string(),
                     description: "Lower rear ride height increases rear stability under braking"
                         .to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Suspension,
-                    parameter: "Front Springs".to_string(),
-                    adjustment: "Stiffen".to_string(),
-                    description: "Stiffer front springs reduce brake dive".to_string(),
+                    priority: 3,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Dampers,
@@ -561,6 +633,7 @@ impl RecommendationEngine {
                     adjustment: "Stiffen".to_string(),
                     description: "Stiffer front bump controls weight transfer under braking"
                         .to_string(),
+                    priority: 2,
                 },
             ],
         );
@@ -574,18 +647,21 @@ impl RecommendationEngine {
                     parameter: "Brake Ducts".to_string(),
                     adjustment: "Open".to_string(),
                     description: "Opening brake ducts increases cooling to tires".to_string(),
+                    priority: 5,
+                },
+                SetupRecommendation {
+                    category: SetupCategory::AntiRollBar,
+                    parameter: "Antirollbars".to_string(),
+                    adjustment: "Soften".to_string(),
+                    description: "Softer Antirollbars reduce tire stress".to_string(),
+                    priority: 4,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Suspension,
                     parameter: "Springs".to_string(),
                     adjustment: "Soften".to_string(),
                     description: "Softer suspension reduces energy transfer to tires".to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::AntiRollBar,
-                    parameter: "ARBs".to_string(),
-                    adjustment: "Soften".to_string(),
-                    description: "Softer ARBs reduce tire stress".to_string(),
+                    priority: 4,
                 },
             ],
         );
@@ -599,18 +675,21 @@ impl RecommendationEngine {
                     parameter: "Brake Ducts".to_string(),
                     adjustment: "Close".to_string(),
                     description: "Closing brake ducts retains heat in tires".to_string(),
+                    priority: 5,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Suspension,
                     parameter: "Springs".to_string(),
                     adjustment: "Stiffen".to_string(),
                     description: "Stiffer suspension generates more tire heat".to_string(),
+                    priority: 4,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Alignment,
                     parameter: "Toe".to_string(),
                     adjustment: "Increase".to_string(),
                     description: "More toe generates friction heat in tires".to_string(),
+                    priority: 2,
                 },
             ],
         );
@@ -624,12 +703,14 @@ impl RecommendationEngine {
                     parameter: "Ride Height".to_string(),
                     adjustment: "Increase".to_string(),
                     description: "Higher ride height prevents suspension bottoming".to_string(),
+                    priority: 5,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Suspension,
                     parameter: "Springs".to_string(),
                     adjustment: "Stiffen".to_string(),
                     description: "Stiffer springs resist compression over bumps".to_string(),
+                    priority: 4,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Dampers,
@@ -637,6 +718,7 @@ impl RecommendationEngine {
                     adjustment: "Stiffen".to_string(),
                     description: "Stiffer fast bump damping controls compression on impacts"
                         .to_string(),
+                    priority: 2,
                 },
             ],
         );
@@ -651,18 +733,21 @@ impl RecommendationEngine {
                     adjustment: "Move Forward".to_string(),
                     description: "Forward brake bias reduces rear instability during trail braking"
                         .to_string(),
-                },
-                SetupRecommendation {
-                    category: SetupCategory::Suspension,
-                    parameter: "Rear Springs".to_string(),
-                    adjustment: "Soften".to_string(),
-                    description: "Softer rear springs improve rear stability".to_string(),
+                    priority: 5,
                 },
                 SetupRecommendation {
                     category: SetupCategory::Drivetrain,
                     parameter: "Differential Preload".to_string(),
                     adjustment: "Increase".to_string(),
                     description: "Higher preload stabilizes rear during coast".to_string(),
+                    priority: 4,
+                },
+                SetupRecommendation {
+                    category: SetupCategory::Suspension,
+                    parameter: "Rear Springs".to_string(),
+                    adjustment: "Soften".to_string(),
+                    description: "Softer rear springs improve rear stability".to_string(),
+                    priority: 4,
                 },
             ],
         );
@@ -684,6 +769,140 @@ impl RecommendationEngine {
             .get(finding_type)
             .cloned()
             .unwrap_or_default()
+    }
+
+    /// Process and prioritize recommendations, detecting conflicts.
+    ///
+    /// Takes a list of recommendations from multiple confirmed findings and:
+    /// - Sorts by priority (highest first)
+    /// - Detects conflicting adjustments to the same parameter
+    /// - Returns processed recommendations with conflict information
+    ///
+    /// # Arguments
+    /// * `recommendations` - Raw recommendations from confirmed findings
+    ///
+    /// # Returns
+    /// Vector of processed recommendations, sorted by priority with conflicts identified
+    pub fn process_recommendations(
+        &self,
+        recommendations: Vec<SetupRecommendation>,
+    ) -> Vec<ProcessedRecommendation> {
+        // Group recommendations by parameter
+        let mut by_parameter: HashMap<String, Vec<SetupRecommendation>> = HashMap::new();
+        for rec in recommendations {
+            by_parameter
+                .entry(rec.parameter.clone())
+                .or_default()
+                .push(rec);
+        }
+
+        let mut processed = Vec::new();
+
+        // Process each parameter group
+        for (_, mut recs) in by_parameter {
+            if recs.len() == 1 {
+                // No conflicts for this parameter
+                let rec = recs.pop().unwrap();
+                processed.push(ProcessedRecommendation {
+                    recommendation: rec,
+                    conflicts: Vec::new(),
+                    has_conflict: false,
+                });
+            } else {
+                // Multiple recommendations for same parameter - check for conflicts
+                let conflicts = Self::detect_conflicts(&recs);
+
+                if conflicts.is_empty() {
+                    // Same adjustment direction - take highest priority
+                    recs.sort_by(|a, b| b.priority.cmp(&a.priority));
+                    let rec = recs.remove(0);
+                    processed.push(ProcessedRecommendation {
+                        recommendation: rec,
+                        conflicts: Vec::new(),
+                        has_conflict: false,
+                    });
+                } else {
+                    // Conflicting adjustments - include all with conflict markers
+                    recs.sort_by(|a, b| b.priority.cmp(&a.priority));
+                    for rec in recs {
+                        let other_conflicts: Vec<_> = conflicts
+                            .iter()
+                            .filter(|c| c.adjustment != rec.adjustment)
+                            .cloned()
+                            .collect();
+
+                        processed.push(ProcessedRecommendation {
+                            recommendation: rec,
+                            conflicts: other_conflicts,
+                            has_conflict: true,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Sort by priority (highest first), then by parameter name for stable ordering
+        processed.sort_by(|a, b| {
+            b.recommendation
+                .priority
+                .cmp(&a.recommendation.priority)
+                .then_with(|| a.recommendation.parameter.cmp(&b.recommendation.parameter))
+        });
+
+        processed
+    }
+
+    /// Detect conflicting adjustments within a group of recommendations.
+    ///
+    /// Returns recommendations that have conflicting adjustment directions.
+    fn detect_conflicts(recs: &[SetupRecommendation]) -> Vec<SetupRecommendation> {
+        let mut conflicts = Vec::new();
+
+        // Check if adjustments are in opposite directions
+        for i in 0..recs.len() {
+            for j in (i + 1)..recs.len() {
+                if Self::is_conflicting(&recs[i].adjustment, &recs[j].adjustment) {
+                    if !conflicts.iter().any(|c: &SetupRecommendation| {
+                        c.parameter == recs[i].parameter && c.adjustment == recs[i].adjustment
+                    }) {
+                        conflicts.push(recs[i].clone());
+                    }
+                    if !conflicts.iter().any(|c: &SetupRecommendation| {
+                        c.parameter == recs[j].parameter && c.adjustment == recs[j].adjustment
+                    }) {
+                        conflicts.push(recs[j].clone());
+                    }
+                }
+            }
+        }
+
+        conflicts
+    }
+
+    /// Check if two adjustment directions conflict.
+    fn is_conflicting(adj1: &str, adj2: &str) -> bool {
+        let adj1_lower = adj1.to_lowercase();
+        let adj2_lower = adj2.to_lowercase();
+
+        // Define opposing adjustment pairs
+        let opposing_pairs = [
+            ("increase", "reduce"),
+            ("increase", "decrease"),
+            ("stiffen", "soften"),
+            ("open", "close"),
+            ("forward", "rearward"),
+            ("forward", "backward"),
+        ];
+
+        for (op1, op2) in &opposing_pairs {
+            if (adj1_lower.contains(op1) && adj2_lower.contains(op2))
+                || (adj1_lower.contains(op2) && adj2_lower.contains(op1))
+            {
+                return true;
+            }
+        }
+
+        false
     }
 }
 
@@ -741,12 +960,14 @@ mod tests {
             parameter: "Front Ride Height".to_string(),
             adjustment: "Reduce".to_string(),
             description: "Lowering front ride height increases front downforce".to_string(),
+            priority: 3,
         };
 
         assert_eq!(rec.category, SetupCategory::Aerodynamics);
         assert_eq!(rec.parameter, "Front Ride Height");
         assert_eq!(rec.adjustment, "Reduce");
         assert!(!rec.description.is_empty());
+        assert_eq!(rec.priority, 3);
     }
 
     #[test]
@@ -756,6 +977,7 @@ mod tests {
             parameter: "Front Spring Rate".to_string(),
             adjustment: "Soften".to_string(),
             description: "Softer springs improve mechanical grip".to_string(),
+            priority: 4,
         };
 
         let cloned = rec.clone();
@@ -763,6 +985,7 @@ mod tests {
         assert_eq!(rec.parameter, cloned.parameter);
         assert_eq!(rec.adjustment, cloned.adjustment);
         assert_eq!(rec.description, cloned.description);
+        assert_eq!(rec.priority, cloned.priority);
     }
 
     #[test]
@@ -933,7 +1156,7 @@ mod proptests {
     use super::*;
     use proptest::prelude::*;
 
-    fn arb_finding_type() -> impl Strategy<Value = FindingType> {
+    fn antirollbar_finding_type() -> impl Strategy<Value = FindingType> {
         prop_oneof![
             Just(FindingType::CornerEntryUndersteer),
             Just(FindingType::CornerEntryOversteer),
@@ -959,7 +1182,7 @@ mod proptests {
         #![proptest_config(ProptestConfig::with_cases(100))]
 
         #[test]
-        fn prop_finding_to_recommendation_mapping(finding_type in arb_finding_type()) {
+        fn prop_finding_to_recommendation_mapping(finding_type in antirollbar_finding_type()) {
             let engine = RecommendationEngine::new();
             let recommendations = engine.get_recommendations(&finding_type);
 
@@ -978,7 +1201,7 @@ mod proptests {
         #![proptest_config(ProptestConfig::with_cases(100))]
 
         #[test]
-        fn prop_recommendation_grouping_by_category(finding_type in arb_finding_type()) {
+        fn prop_recommendation_grouping_by_category(finding_type in antirollbar_finding_type()) {
             let engine = RecommendationEngine::new();
             let recommendations = engine.get_recommendations(&finding_type);
 
