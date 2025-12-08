@@ -241,6 +241,9 @@ impl ACCTelemetryProducer {
 #[cfg(windows)]
 impl TelemetryProducer for ACCTelemetryProducer {
     fn start(&mut self) -> Result<(), OcypodeError> {
+        use log::info;
+
+        info!("ACC: Starting connection to shared memory...");
         let retry_delay = Duration::from_millis(self.retry_wait_ms);
 
         let client = tokio::runtime::Runtime::new().unwrap().block_on(
@@ -248,11 +251,15 @@ impl TelemetryProducer for ACCTelemetryProducer {
         );
 
         self.client = Some(client);
+        info!("ACC: Connection established successfully");
         Ok(())
     }
 
     fn session_info(&mut self) -> Result<SessionInfo, OcypodeError> {
+        use log::error;
+
         if self.client.is_none() {
+            error!("ACC: Client not initialized when requesting session info");
             return Err(OcypodeError::TelemetryProducerError {
                 description: "The ACC connection is not initialized, call start() first."
                     .to_string(),
@@ -265,8 +272,11 @@ impl TelemetryProducer for ACCTelemetryProducer {
         let _state = tokio::runtime::Runtime::new()
             .unwrap()
             .block_on(client.next_sim_state())
-            .ok_or(OcypodeError::TelemetryProducerError {
-                description: "Could not retrieve ACC state".to_string(),
+            .ok_or_else(|| {
+                error!("ACC: Could not retrieve state - game may not be in an active session");
+                OcypodeError::TelemetryProducerError {
+                    description: "Could not retrieve ACC state".to_string(),
+                }
             })?;
 
         // For ACC, we need to extract track info from the static data
@@ -294,7 +304,10 @@ impl TelemetryProducer for ACCTelemetryProducer {
     }
 
     fn telemetry(&mut self) -> Result<TelemetryData, OcypodeError> {
+        use log::{debug, error};
+
         if self.client.is_none() {
+            error!("ACC: Client not initialized when requesting telemetry");
             return Err(OcypodeError::TelemetryProducerError {
                 description: "The ACC connection is not initialized, call start() first."
                     .to_string(),
@@ -317,9 +330,21 @@ impl TelemetryProducer for ACCTelemetryProducer {
         let state = tokio::runtime::Runtime::new()
             .unwrap()
             .block_on(client.next_sim_state())
-            .ok_or(OcypodeError::TelemetryProducerError {
-                description: "Could not retrieve ACC telemetry".to_string(),
+            .ok_or_else(|| {
+                error!(
+                    "ACC: Could not retrieve telemetry data - game may have closed or session ended"
+                );
+                OcypodeError::TelemetryProducerError {
+                    description: "Could not retrieve ACC telemetry".to_string(),
+                }
             })?;
+
+        if self.point_no % 100 == 0 {
+            debug!(
+                "ACC: Successfully retrieved telemetry point #{}",
+                self.point_no
+            );
+        }
 
         Ok(TelemetryData::from_acc_state(&state, self.point_no))
     }

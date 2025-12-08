@@ -1,8 +1,13 @@
+pub(crate) mod bottoming_out_analyzer;
+pub(crate) mod brake_lock_analyzer;
 pub(crate) mod collector;
+pub(crate) mod entry_oversteer_analyzer;
+pub(crate) mod mid_corner_analyzer;
 pub(crate) mod producer;
 pub(crate) mod scrub_analyzer;
 pub(crate) mod short_shifting_analyzer;
 pub(crate) mod slip_analyzer;
+pub(crate) mod tire_temperature_analyzer;
 pub(crate) mod trailbrake_steering_analyzer;
 pub(crate) mod wheelspin_analyzer;
 
@@ -43,6 +48,42 @@ pub enum TelemetryAnnotation {
         cur_rpm_increase: f32,
         is_wheelspin: bool,
     },
+    EntryOversteer {
+        expected_yaw_rate: f32,
+        actual_yaw_rate: f32,
+        is_oversteer: bool,
+    },
+    MidCornerUndersteer {
+        speed_loss: f32,
+        is_understeer: bool,
+    },
+    MidCornerOversteer {
+        yaw_rate_excess: f32,
+        is_oversteer: bool,
+    },
+    FrontBrakeLock {
+        abs_activation_count: usize,
+        is_front_lock: bool,
+    },
+    RearBrakeLock {
+        abs_activation_count: usize,
+        is_rear_lock: bool,
+    },
+    TireOverheating {
+        avg_temp: f32,
+        optimal_max: f32,
+        is_overheating: bool,
+    },
+    TireCold {
+        avg_temp: f32,
+        optimal_min: f32,
+        is_cold: bool,
+    },
+    BottomingOut {
+        pitch_change: f32,
+        speed_loss: f32,
+        is_bottoming: bool,
+    },
 }
 
 impl Display for TelemetryAnnotation {
@@ -73,6 +114,42 @@ impl Display for TelemetryAnnotation {
                 cur_rpm_increase: _,
                 is_wheelspin: _,
             } => write!(f, "wheelspin"),
+            TelemetryAnnotation::EntryOversteer {
+                expected_yaw_rate: _,
+                actual_yaw_rate: _,
+                is_oversteer: _,
+            } => write!(f, "entry_oversteer"),
+            TelemetryAnnotation::MidCornerUndersteer {
+                speed_loss: _,
+                is_understeer: _,
+            } => write!(f, "mid_corner_understeer"),
+            TelemetryAnnotation::MidCornerOversteer {
+                yaw_rate_excess: _,
+                is_oversteer: _,
+            } => write!(f, "mid_corner_oversteer"),
+            TelemetryAnnotation::FrontBrakeLock {
+                abs_activation_count: _,
+                is_front_lock: _,
+            } => write!(f, "front_brake_lock"),
+            TelemetryAnnotation::RearBrakeLock {
+                abs_activation_count: _,
+                is_rear_lock: _,
+            } => write!(f, "rear_brake_lock"),
+            TelemetryAnnotation::TireOverheating {
+                avg_temp: _,
+                optimal_max: _,
+                is_overheating: _,
+            } => write!(f, "tire_overheating"),
+            TelemetryAnnotation::TireCold {
+                avg_temp: _,
+                optimal_min: _,
+                is_cold: _,
+            } => write!(f, "tire_cold"),
+            TelemetryAnnotation::BottomingOut {
+                pitch_change: _,
+                speed_loss: _,
+                is_bottoming: _,
+            } => write!(f, "bottoming_out"),
         }
     }
 }
@@ -686,6 +763,17 @@ impl Default for SessionInfo {
 ///
 /// This trait supports Requirements 1.2 and 5.1 by providing a game-agnostic interface
 /// for telemetry analysis that works with the intermediate representation.
+/// Trait for analyzing telemetry data and detecting driving issues.
+///
+/// Analyzers process telemetry data to identify specific driving patterns or issues
+/// such as slip, wheelspin, scrubbing, trail braking, and short shifting. Each analyzer
+/// receives the unified `TelemetryData` representation, which provides access to all
+/// available telemetry fields regardless of the source game.
+///
+/// # Requirements
+///
+/// This trait supports Requirements 1.2 and 5.1 by providing a game-agnostic interface
+/// for telemetry analysis that works with the intermediate representation.
 pub trait TelemetryAnalyzer {
     /// Analyze telemetry data and return any detected annotations.
     ///
@@ -1055,5 +1143,188 @@ mod tests {
         assert_eq!(deserialized.gear, Some(5));
         assert_eq!(deserialized.engine_rpm, Some(7000.0));
         assert_eq!(deserialized.throttle, Some(1.0));
+    }
+
+    #[test]
+    fn test_new_annotation_types_serialization() {
+        // Test EntryOversteer annotation
+        let entry_oversteer = TelemetryAnnotation::EntryOversteer {
+            expected_yaw_rate: 0.5,
+            actual_yaw_rate: 0.8,
+            is_oversteer: true,
+        };
+        let json = serde_json::to_string(&entry_oversteer).expect("Failed to serialize");
+        let deserialized: TelemetryAnnotation =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(deserialized, entry_oversteer);
+
+        // Test MidCornerUndersteer annotation
+        let mid_understeer = TelemetryAnnotation::MidCornerUndersteer {
+            speed_loss: 2.5,
+            is_understeer: true,
+        };
+        let json = serde_json::to_string(&mid_understeer).expect("Failed to serialize");
+        let deserialized: TelemetryAnnotation =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(deserialized, mid_understeer);
+
+        // Test MidCornerOversteer annotation
+        let mid_oversteer = TelemetryAnnotation::MidCornerOversteer {
+            yaw_rate_excess: 0.3,
+            is_oversteer: true,
+        };
+        let json = serde_json::to_string(&mid_oversteer).expect("Failed to serialize");
+        let deserialized: TelemetryAnnotation =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(deserialized, mid_oversteer);
+
+        // Test FrontBrakeLock annotation
+        let front_lock = TelemetryAnnotation::FrontBrakeLock {
+            abs_activation_count: 3,
+            is_front_lock: true,
+        };
+        let json = serde_json::to_string(&front_lock).expect("Failed to serialize");
+        let deserialized: TelemetryAnnotation =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(deserialized, front_lock);
+
+        // Test RearBrakeLock annotation
+        let rear_lock = TelemetryAnnotation::RearBrakeLock {
+            abs_activation_count: 2,
+            is_rear_lock: true,
+        };
+        let json = serde_json::to_string(&rear_lock).expect("Failed to serialize");
+        let deserialized: TelemetryAnnotation =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(deserialized, rear_lock);
+
+        // Test TireOverheating annotation
+        let tire_hot = TelemetryAnnotation::TireOverheating {
+            avg_temp: 105.0,
+            optimal_max: 95.0,
+            is_overheating: true,
+        };
+        let json = serde_json::to_string(&tire_hot).expect("Failed to serialize");
+        let deserialized: TelemetryAnnotation =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(deserialized, tire_hot);
+
+        // Test TireCold annotation
+        let tire_cold = TelemetryAnnotation::TireCold {
+            avg_temp: 70.0,
+            optimal_min: 80.0,
+            is_cold: true,
+        };
+        let json = serde_json::to_string(&tire_cold).expect("Failed to serialize");
+        let deserialized: TelemetryAnnotation =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(deserialized, tire_cold);
+
+        // Test BottomingOut annotation
+        let bottoming = TelemetryAnnotation::BottomingOut {
+            pitch_change: 0.15,
+            speed_loss: 3.0,
+            is_bottoming: true,
+        };
+        let json = serde_json::to_string(&bottoming).expect("Failed to serialize");
+        let deserialized: TelemetryAnnotation =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(deserialized, bottoming);
+    }
+
+    #[test]
+    fn test_new_annotation_types_display() {
+        // Test Display implementation for new annotation types
+        assert_eq!(
+            format!(
+                "{}",
+                TelemetryAnnotation::EntryOversteer {
+                    expected_yaw_rate: 0.5,
+                    actual_yaw_rate: 0.8,
+                    is_oversteer: true,
+                }
+            ),
+            "entry_oversteer"
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                TelemetryAnnotation::MidCornerUndersteer {
+                    speed_loss: 2.5,
+                    is_understeer: true,
+                }
+            ),
+            "mid_corner_understeer"
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                TelemetryAnnotation::MidCornerOversteer {
+                    yaw_rate_excess: 0.3,
+                    is_oversteer: true,
+                }
+            ),
+            "mid_corner_oversteer"
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                TelemetryAnnotation::FrontBrakeLock {
+                    abs_activation_count: 3,
+                    is_front_lock: true,
+                }
+            ),
+            "front_brake_lock"
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                TelemetryAnnotation::RearBrakeLock {
+                    abs_activation_count: 2,
+                    is_rear_lock: true,
+                }
+            ),
+            "rear_brake_lock"
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                TelemetryAnnotation::TireOverheating {
+                    avg_temp: 105.0,
+                    optimal_max: 95.0,
+                    is_overheating: true,
+                }
+            ),
+            "tire_overheating"
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                TelemetryAnnotation::TireCold {
+                    avg_temp: 70.0,
+                    optimal_min: 80.0,
+                    is_cold: true,
+                }
+            ),
+            "tire_cold"
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                TelemetryAnnotation::BottomingOut {
+                    pitch_change: 0.15,
+                    speed_loss: 3.0,
+                    is_bottoming: true,
+                }
+            ),
+            "bottoming_out"
+        );
     }
 }

@@ -1,7 +1,9 @@
 use egui::{Pos2, Vec2};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 use crate::OcypodeError;
+use crate::setup_assistant::{Finding, FindingType};
 
 use super::{HISTORY_SECONDS, REFRESH_RATE_MS};
 
@@ -50,6 +52,7 @@ impl From<Pos2> for WindowPosition {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(default)]
 pub(crate) struct AppConfig {
     pub(crate) refresh_rate_ms: usize,
     pub(crate) window_size_s: usize,
@@ -57,6 +60,10 @@ pub(crate) struct AppConfig {
     pub(crate) alerts_layout: AlertsLayout,
     pub(crate) telemetry_window_position: WindowPosition,
     pub(crate) alert_window_position: WindowPosition,
+    pub(crate) show_setup_window: bool,
+    pub(crate) setup_window_position: WindowPosition,
+    pub(crate) setup_assistant_findings: HashMap<FindingType, Finding>,
+    pub(crate) setup_assistant_confirmed_findings: HashSet<FindingType>,
 }
 
 impl Default for AppConfig {
@@ -68,6 +75,10 @@ impl Default for AppConfig {
             alerts_layout: AlertsLayout::Vertical,
             telemetry_window_position: WindowPosition::default(),
             alert_window_position: WindowPosition::default(),
+            show_setup_window: false,
+            setup_window_position: WindowPosition::default(),
+            setup_assistant_findings: HashMap::new(),
+            setup_assistant_confirmed_findings: HashSet::new(),
         }
     }
 }

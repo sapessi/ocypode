@@ -31,10 +31,30 @@ impl LiveTelemetryApp {
                 ui.with_layout(Layout::left_to_right(egui::Align::Center), |ui| {
                     ui.add_space(10.);
                     // icons from https://remixicon.com/
-                    ui.add(
-                        ImageButton::new(egui::include_image!("../../../assets/tools-fill.png"))
+                    if ui
+                        .add(
+                            ImageButton::new(egui::include_image!(
+                                "../../../assets/tools-fill.png"
+                            ))
                             .corner_radius(DEFAULT_BUTTON_CORNER_RADIUS),
-                    );
+                        )
+                        .clicked()
+                    {
+                        self.app_config.show_setup_window = !self.app_config.show_setup_window;
+
+                        // Save setup assistant state to config
+                        self.app_config.setup_assistant_findings =
+                            self.setup_assistant.get_findings_for_persistence().clone();
+                        self.app_config.setup_assistant_confirmed_findings = self
+                            .setup_assistant
+                            .get_confirmed_findings_for_persistence()
+                            .clone();
+
+                        // Save config immediately to persist visibility state and findings
+                        if let Err(e) = self.app_config.save() {
+                            log::error!("Failed to save config after toggling setup window: {}", e);
+                        }
+                    };
                     if ui
                         .add(
                             ImageButton::new(egui::include_image!(
