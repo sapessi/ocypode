@@ -185,13 +185,12 @@ impl<'file> TelemetryAnalysisApp<'file> {
                     .auto_bounds(Vec2b::new(false, false))
                     .show(ui, |plot_ui| {
                         plot_ui.line(
-                            Line::new(throttle_points)
+                            Line::new("Throttle", throttle_points)
                                 .color(Color32::GREEN)
-                                .fill(0.)
-                                .name("Throttle"),
+                                .fill(0.),
                         );
                         plot_ui.line(
-                            Line::new(brake_points)
+                            Line::new("Brake", brake_points)
                                 .gradient_color(
                                     Arc::new(|point| {
                                         stroke_shade(
@@ -203,89 +202,81 @@ impl<'file> TelemetryAnalysisApp<'file> {
                                     true,
                                 )
                                 .color(Color32::RED)
-                                .fill(0.)
-                                .name("Brake"),
+                                .fill(0.),
                         );
                         plot_ui.line(
-                            Line::new(steering_points)
-                                .color(Color32::LIGHT_GRAY)
-                                .name("Steering"),
+                            Line::new("Steering", steering_points).color(Color32::LIGHT_GRAY),
                         );
                         plot_ui.points(
-                            Points::new(annotation_points)
+                            Points::new("Annotation", annotation_points)
                                 .color(Color32::BLUE)
-                                .radius(10.)
-                                .name("Annotation"),
+                                .radius(10.),
                         );
 
-                        if !self.comparison_lap.is_empty() {
-                            if let Some(comparison_lap) = session
+                        if !self.comparison_lap.is_empty()
+                            && let Some(comparison_lap) = session
                                 .laps
                                 .get(self.comparison_lap.parse::<usize>().unwrap())
-                            {
-                                let comparison_throttle_points = PlotPoints::new(
-                                    comparison_lap
-                                        .telemetry
-                                        .iter()
-                                        .enumerate()
-                                        .map(|t| {
-                                            let throttle = t.1.throttle.unwrap_or(0.0);
-                                            [t.0 as f64, throttle as f64 * 100.]
-                                        })
-                                        .collect(),
-                                );
-                                let comparison_brake_points = PlotPoints::new(
-                                    comparison_lap
-                                        .telemetry
-                                        .iter()
-                                        .enumerate()
-                                        .map(|t| {
-                                            let brake = t.1.brake.unwrap_or(0.0);
-                                            [t.0 as f64, brake as f64 * 100.]
-                                        })
-                                        .collect(),
-                                );
-                                let comparison_steering_points = PlotPoints::new(
-                                    comparison_lap
-                                        .telemetry
-                                        .iter()
-                                        .enumerate()
-                                        .map(|t| {
-                                            let steering_pct = t.1.steering_pct.unwrap_or(0.0);
-                                            [t.0 as f64, 50. + 50. * steering_pct as f64]
-                                        })
-                                        .collect(),
-                                );
+                        {
+                            let comparison_throttle_points = PlotPoints::new(
+                                comparison_lap
+                                    .telemetry
+                                    .iter()
+                                    .enumerate()
+                                    .map(|t| {
+                                        let throttle = t.1.throttle.unwrap_or(0.0);
+                                        [t.0 as f64, throttle as f64 * 100.]
+                                    })
+                                    .collect(),
+                            );
+                            let comparison_brake_points = PlotPoints::new(
+                                comparison_lap
+                                    .telemetry
+                                    .iter()
+                                    .enumerate()
+                                    .map(|t| {
+                                        let brake = t.1.brake.unwrap_or(0.0);
+                                        [t.0 as f64, brake as f64 * 100.]
+                                    })
+                                    .collect(),
+                            );
+                            let comparison_steering_points = PlotPoints::new(
+                                comparison_lap
+                                    .telemetry
+                                    .iter()
+                                    .enumerate()
+                                    .map(|t| {
+                                        let steering_pct = t.1.steering_pct.unwrap_or(0.0);
+                                        [t.0 as f64, 50. + 50. * steering_pct as f64]
+                                    })
+                                    .collect(),
+                            );
 
-                                plot_ui.line(
-                                    Line::new(comparison_throttle_points)
-                                        .color(Color32::DARK_GREEN)
-                                        .name("Comparison Throttle"),
-                                );
-                                plot_ui.line(
-                                    Line::new(comparison_brake_points)
-                                        .color(Color32::DARK_RED)
-                                        .name("Comparison Brake"),
-                                );
-                                plot_ui.line(
-                                    Line::new(comparison_steering_points)
-                                        .color(Color32::DARK_GRAY.gamma_multiply(0.3))
-                                        .name("Comparison Steering"),
-                                );
-                            }
+                            plot_ui.line(
+                                Line::new("Comparison Throttle", comparison_throttle_points)
+                                    .color(Color32::DARK_GREEN),
+                            );
+                            plot_ui.line(
+                                Line::new("Comparison Brake", comparison_brake_points)
+                                    .color(Color32::DARK_RED),
+                            );
+                            plot_ui.line(
+                                Line::new("Comparison Steering", comparison_steering_points)
+                                    .color(Color32::DARK_GRAY.gamma_multiply(0.3)),
+                            );
                         }
                     });
-                if plot_response.response.clicked() {
-                    if let Some(mouse_pos) = plot_response.response.interact_pointer_pos() {
-                        self.selected_annotation_content = "".to_string();
-                        self.selected_x = Some(
-                            plot_response
-                                .transform
-                                .value_from_position(mouse_pos)
-                                .x
-                                .floor() as usize,
-                        );
-                    }
+                if plot_response.response.clicked()
+                    && let Some(mouse_pos) = plot_response.response.interact_pointer_pos()
+                {
+                    self.selected_annotation_content = "".to_string();
+                    self.selected_x = Some(
+                        plot_response
+                            .transform
+                            .value_from_position(mouse_pos)
+                            .x
+                            .floor() as usize,
+                    );
                 }
             }
         });
@@ -343,9 +334,7 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                     .max_width(ctx.available_rect().height() / 7.)
                     .show(ctx, |local_ui| {
                         if let Ok(selected_lap) = self.selected_lap.parse::<usize>() {
-                            if let Some(x_point) = self.selected_x {
-                                if let Some(lap) = session.laps.get(selected_lap) {
-                                    if let Some(telemetry) = lap.telemetry.get(x_point) {
+                            if let Some(x_point) = self.selected_x && let Some(lap) = session.laps.get(selected_lap) && let Some(telemetry) = lap.telemetry.get(x_point) {
                                         let mut abs_alert = DefaultAlert::abs().button();
                                         let mut shift_alert = DefaultAlert::shift().button();
                                         let mut traction_alert = DefaultAlert::traction().button();
@@ -364,8 +353,7 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                                 self.selected_annotation_content = format!("brake force: {:.2}", brake);
                                             };
                                             ui.separator();
-                                            if shift_alert.show(ui, Align::Center).clicked() {
-                                                if let Some(TelemetryAnnotation::ShortShifting { gear_change_rpm, optimal_rpm, .. }) =
+                                            if shift_alert.show(ui, Align::Center).clicked() && let Some(TelemetryAnnotation::ShortShifting { gear_change_rpm, optimal_rpm, .. }) =
                                                     telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::ShortShifting { .. })) {
                                                         let cur_gear = telemetry.gear.unwrap_or(0);
                                                         self.selected_annotation_content = format!(
@@ -375,11 +363,9 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                                             optimal_rpm,
                                                             gear_change_rpm
                                                         )
-                                                }
                                             }
                                             ui.separator();
-                                            if traction_alert.show(ui, Align::Center).clicked() {
-                                                if let Some(TelemetryAnnotation::Wheelspin { avg_rpm_increase_per_gear, cur_gear, cur_rpm_increase, .. }) =
+                                            if traction_alert.show(ui, Align::Center).clicked() && let Some(TelemetryAnnotation::Wheelspin { avg_rpm_increase_per_gear, cur_gear, cur_rpm_increase, .. }) =
                                                     telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::Wheelspin { .. })) {
                                                         self.selected_annotation_content = format!(
                                                             "Gear: {}\nRPM increase: {:.1}\np90 RPM increase: {:.1}\nRPM increase per gear:\n{}",
@@ -388,11 +374,9 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                                             avg_rpm_increase_per_gear.get(cur_gear).unwrap(),
                                                             serde_json::to_string_pretty(avg_rpm_increase_per_gear).unwrap()
                                                         );
-                                                }
                                             }
                                             ui.separator();
-                                            if trailbrake_steering_alert.show(ui, Align::Center).clicked() {
-                                                if let Some(TelemetryAnnotation::TrailbrakeSteering { cur_trailbrake_steering, .. }) =
+                                            if trailbrake_steering_alert.show(ui, Align::Center).clicked() && let Some(TelemetryAnnotation::TrailbrakeSteering { cur_trailbrake_steering, .. }) =
                                                     telemetry.annotations.iter().find(|p| matches!(p, TelemetryAnnotation::TrailbrakeSteering { .. })) {
                                                         let steering = telemetry.steering_angle_rad.unwrap_or(0.0);
                                                         self.selected_annotation_content = format!(
@@ -400,7 +384,6 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                                             cur_trailbrake_steering,
                                                             steering
                                                         );
-                                                }
                                             }
                                             ui.separator();
                                             if slip_alert.show(ui, Align::Center).clicked() {
@@ -435,7 +418,6 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                             Label::new(RichText::new(self.selected_annotation_content.clone()).color(Color32::WHITE))
                                         );
                                     }
-                                }
                             } else {
                                 local_ui.with_layout(
                                     Layout::centered_and_justified(Direction::TopDown),
@@ -448,7 +430,6 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                     },
                                 );
                             }
-                        }
                     });
                 egui::CentralPanel::default()
                     .frame(

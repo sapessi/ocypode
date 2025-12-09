@@ -6,7 +6,9 @@ use crate::OcypodeError;
 
 use super::{GameSource, SessionInfo, TelemetryData, TelemetryOutput};
 
+#[allow(unused)]
 const CONN_RETRY_WAIT_MS: u64 = 200;
+#[allow(unused)]
 const MAX_STEERING_ANGLE_DEFAULT: f32 = std::f32::consts::PI;
 pub(crate) const CONN_RETRY_MAX_WAIT_S: u64 = 600;
 
@@ -71,6 +73,7 @@ pub trait TelemetryProducer {
 }
 
 #[cfg(windows)]
+#[allow(unused)]
 pub(crate) struct IRacingTelemetryProducer {
     client: Option<simetry::iracing::Client>,
     retry_wait_ms: u64,
@@ -87,6 +90,7 @@ impl Default for IRacingTelemetryProducer {
 
 #[cfg(windows)]
 impl IRacingTelemetryProducer {
+    #[allow(unused)]
     pub fn new(retry_wait_ms: u64, retry_timeout_s: u64) -> Self {
         Self {
             client: None,
@@ -212,6 +216,7 @@ impl TelemetryProducer for IRacingTelemetryProducer {
 }
 
 #[cfg(windows)]
+#[allow(unused)]
 pub(crate) struct ACCTelemetryProducer {
     client: Option<simetry::assetto_corsa_competizione::Client>,
     retry_wait_ms: u64,
@@ -228,6 +233,7 @@ impl Default for ACCTelemetryProducer {
 
 #[cfg(windows)]
 impl ACCTelemetryProducer {
+    #[allow(unused)]
     pub fn new(retry_wait_ms: u64, retry_timeout_s: u64) -> Self {
         Self {
             client: None,
@@ -339,7 +345,7 @@ impl TelemetryProducer for ACCTelemetryProducer {
                 }
             })?;
 
-        if self.point_no % 100 == 0 {
+        if self.point_no.is_multiple_of(100) {
             debug!(
                 "ACC: Successfully retrieved telemetry point #{}",
                 self.point_no

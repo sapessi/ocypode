@@ -1,4 +1,4 @@
-use egui::{Align, CornerRadius, Frame, Id, ImageButton, Layout, Sense, ViewportCommand};
+use egui::{Align, Button, CornerRadius, Frame, Id, Layout, Sense, ViewportCommand};
 
 use crate::ui::{Alert, DefaultAlert};
 
@@ -18,15 +18,16 @@ impl LiveTelemetryApp {
                 if drag_sense.dragged() {
                     ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
                 }
-                if drag_sense.drag_stopped() {
-                    if let Some(outer_rect) = ui.input(|is| is.viewport().outer_rect) {
-                        self.app_config.alert_window_position = outer_rect.min.into();
-                    };
-                }
+                if drag_sense.drag_stopped()
+                    && let Some(outer_rect) = ui.input(|is| is.viewport().outer_rect)
+                {
+                    self.app_config.alert_window_position = outer_rect.min.into();
+                };
+
                 match self.app_config.alerts_layout {
                     AlertsLayout::Vertical => {
                         if ui
-                            .add(ImageButton::new(egui::include_image!(
+                            .add(Button::image(egui::include_image!(
                                 "../../../assets/layout-horizontal-fill.png"
                             )))
                             .clicked()
@@ -36,7 +37,7 @@ impl LiveTelemetryApp {
                     }
                     AlertsLayout::Horizontal => {
                         if ui
-                            .add(ImageButton::new(egui::include_image!(
+                            .add(Button::image(egui::include_image!(
                                 "../../../assets/layout-vertical-fill.png"
                             )))
                             .clicked()

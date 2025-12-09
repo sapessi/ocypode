@@ -33,14 +33,14 @@ impl LiveTelemetryApp {
                     ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
                 }
                 // Save position when drag stops
-                if drag_sense.drag_stopped() {
-                    if let Some(outer_rect) = ui.input(|is| is.viewport().outer_rect) {
-                        self.app_config.setup_window_position = outer_rect.min.into();
-                        // Save config immediately to persist position
-                        if let Err(e) = self.app_config.save() {
-                            log::error!("Failed to save config after window drag: {}", e);
-                        }
-                    };
+                if drag_sense.drag_stopped()
+                    && let Some(outer_rect) = ui.input(|is| is.viewport().outer_rect)
+                {
+                    self.app_config.setup_window_position = outer_rect.min.into();
+                    // Save config immediately to persist position
+                    if let Err(e) = self.app_config.save() {
+                        log::error!("Failed to save config after window drag: {}", e);
+                    }
                 }
 
                 // Window title and controls

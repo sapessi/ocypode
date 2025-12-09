@@ -26,6 +26,8 @@ Ocypode can also save and visualize telemetry data showing the driving alerts it
 ![Load saved telemetry with alerts](/screenshots/telemetry_analysis_basic.png)
 
 ### Setup Assistant
+![Live setup assistant](/screenshots/live_setup_assistant.png)
+
 The Setup Assistant takes telemetry analysis a step further by automatically detecting handling issues and providing specific car setup recommendations. It monitors your driving in real-time, identifies problems like understeer, oversteer, brake locking, and tire temperature issues, then suggests precise setup changes based on proven methodology.
 
 You confirm the issues you actually feel in the car, and the Setup Assistant provides targeted recommendations organized by category (aero, suspension, brakes, etc.). This bridges the gap between raw telemetry data and actionable setup improvements, helping you optimize your car without needing deep setup expertise.

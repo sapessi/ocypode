@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use egui::{Align, Color32, Image, ImageButton, Layout, Response, RichText, Ui};
+use egui::{Align, Button, Color32, Image, Layout, Response, RichText, Ui};
 use log::debug;
 
 use crate::{
@@ -146,7 +146,7 @@ impl Alert for DefaultAlert<'_> {
         ui.with_layout(Layout::top_down(align), |ui| {
             ui.label(RichText::new(self.text.clone()).color(Color32::WHITE));
             if self.is_button {
-                ui.add(ImageButton::new(self.current_image.clone()).frame(false))
+                ui.add(Button::image(self.current_image.clone()).frame(false))
             } else {
                 ui.add(self.current_image.clone())
             }
@@ -230,7 +230,7 @@ impl Alert for ScrubSlipAlert {
         ui.with_layout(Layout::top_down(button_align), |ui| {
             ui.label(RichText::new(text).color(Color32::WHITE));
             if self.is_button {
-                ui.add(ImageButton::new(turn_image).frame(false))
+                ui.add(Button::image(turn_image).frame(false))
             } else {
                 ui.add(Image::new(turn_image))
             }

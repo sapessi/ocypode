@@ -120,10 +120,10 @@ impl eframe::App for LiveTelemetryApp {
         while let Ok(output) = self.telemetry_receiver.try_recv() {
             match output {
                 TelemetryOutput::DataPoint(point) => {
-                    if let Some(last) = self.telemetry_points.back() {
-                        if point.point_no < last.point_no {
-                            self.telemetry_points.clear()
-                        }
+                    if let Some(last) = self.telemetry_points.back()
+                        && point.point_no < last.point_no
+                    {
+                        self.telemetry_points.clear()
                     }
 
                     // Process telemetry through setup assistant

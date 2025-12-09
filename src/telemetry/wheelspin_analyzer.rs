@@ -42,18 +42,18 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for WheelspinAnalyzer<WINDOW_SI
             if cur_rpm > self.prev_rpm && cur_gear > 0 {
                 let rpm_growth = cur_rpm - self.prev_rpm;
 
-                if let Some(cur_average) = self.cur_averages.get(&cur_gear) {
-                    if rpm_growth > *cur_average
-                        && *self.cur_gear_points.entry(cur_gear).or_insert(0) >= WINDOW_SIZE
-                    {
-                        output.push(TelemetryAnnotation::Wheelspin {
-                            avg_rpm_increase_per_gear: self.cur_averages.clone(),
-                            cur_gear,
-                            cur_rpm_increase: rpm_growth,
-                            is_wheelspin: true,
-                        });
-                    }
+                if let Some(cur_average) = self.cur_averages.get(&cur_gear)
+                    && rpm_growth > *cur_average
+                    && *self.cur_gear_points.entry(cur_gear).or_insert(0) >= WINDOW_SIZE
+                {
+                    output.push(TelemetryAnnotation::Wheelspin {
+                        avg_rpm_increase_per_gear: self.cur_averages.clone(),
+                        cur_gear,
+                        cur_rpm_increase: rpm_growth,
+                        is_wheelspin: true,
+                    });
                 }
+
                 // we only add a data point to our average if the user is in full acceleration
                 if throttle > 0.95 && brake == 0. {
                     self.telemetry_window

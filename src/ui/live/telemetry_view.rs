@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use egui::{Color32, CornerRadius, Frame, Id, ImageButton, Layout, Sense, Vec2b, ViewportCommand};
+use egui::{Button, Color32, CornerRadius, Frame, Id, Layout, Sense, Vec2b, ViewportCommand};
 use egui_plot::{Line, PlotPoints};
 
 use crate::ui::stroke_shade;
@@ -23,20 +23,19 @@ impl LiveTelemetryApp {
                 if drag_sense.dragged() {
                     ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
                 }
-                if drag_sense.drag_stopped() {
-                    if let Some(outer_rect) = ui.input(|is| is.viewport().outer_rect) {
-                        self.app_config.telemetry_window_position = outer_rect.min.into();
-                    }
+                if drag_sense.drag_stopped()
+                    && let Some(outer_rect) = ui.input(|is| is.viewport().outer_rect)
+                {
+                    self.app_config.telemetry_window_position = outer_rect.min.into();
                 }
+
                 ui.with_layout(Layout::left_to_right(egui::Align::Center), |ui| {
                     ui.add_space(10.);
                     // icons from https://remixicon.com/
                     if ui
                         .add(
-                            ImageButton::new(egui::include_image!(
-                                "../../../assets/tools-fill.png"
-                            ))
-                            .corner_radius(DEFAULT_BUTTON_CORNER_RADIUS),
+                            Button::image(egui::include_image!("../../../assets/tools-fill.png"))
+                                .corner_radius(DEFAULT_BUTTON_CORNER_RADIUS),
                         )
                         .clicked()
                     {
@@ -57,10 +56,8 @@ impl LiveTelemetryApp {
                     };
                     if ui
                         .add(
-                            ImageButton::new(egui::include_image!(
-                                "../../../assets/alert-fill.png"
-                            ))
-                            .corner_radius(DEFAULT_BUTTON_CORNER_RADIUS),
+                            Button::image(egui::include_image!("../../../assets/alert-fill.png"))
+                                .corner_radius(DEFAULT_BUTTON_CORNER_RADIUS),
                         )
                         .clicked()
                     {
@@ -71,7 +68,7 @@ impl LiveTelemetryApp {
                         ui.add_space(10.);
                         if ui
                             .add(
-                                ImageButton::new(egui::include_image!(
+                                Button::image(egui::include_image!(
                                     "../../../assets/close-circle-fill.png"
                                 ))
                                 .corner_radius(DEFAULT_BUTTON_CORNER_RADIUS),
@@ -121,13 +118,12 @@ impl LiveTelemetryApp {
 
                 plot.show_background(false).show(ui, |plot_ui| {
                     plot_ui.line(
-                        Line::new(throttle_points)
+                        Line::new("Throttle", throttle_points)
                             .color(Color32::GREEN)
-                            .fill(0.)
-                            .name("Throttle"),
+                            .fill(0.),
                     );
                     plot_ui.line(
-                        Line::new(brake_points)
+                        Line::new("Brake", brake_points)
                             .gradient_color(
                                 Arc::new(|point| {
                                     stroke_shade(
@@ -139,14 +135,9 @@ impl LiveTelemetryApp {
                                 true,
                             )
                             .color(Color32::RED)
-                            .fill(0.)
-                            .name("Brake"),
+                            .fill(0.),
                     );
-                    plot_ui.line(
-                        Line::new(steering_points)
-                            .color(Color32::LIGHT_GRAY)
-                            .name("Steering"),
-                    );
+                    plot_ui.line(Line::new("Steering", steering_points).color(Color32::LIGHT_GRAY));
                 });
             });
         // make it always repaint. TODO: can we slow down here?
