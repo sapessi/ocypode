@@ -139,7 +139,7 @@ impl TelemetryAnalyzer for TireTemperatureAnalyzer {
         self.sample_counter += 1;
 
         // Only sample at the specified interval
-        if self.sample_counter.is_multiple_of(self.sample_interval) {
+        if !self.sample_counter.is_multiple_of(self.sample_interval) {
             return output;
         }
 
