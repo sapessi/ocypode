@@ -1,5 +1,7 @@
 use simple_moving_average::{SMA, SumTreeSMA};
 
+use crate::telemetry::is_telemetry_point_analyzable;
+
 use super::{TelemetryAnalyzer, TelemetryAnnotation, TelemetryData};
 
 /// Minimum brake percentage to consider for entry oversteer detection
@@ -31,8 +33,8 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for EntryOversteerAnalyzer<WIND
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
 
-        // Skip analysis if pit limiter is engaged (not at racing speed)
-        if telemetry.is_pit_limiter_engaged.unwrap_or(false) {
+        // Skip analysis if doesn't meet requirements
+        if !is_telemetry_point_analyzable(telemetry) {
             return output;
         }
 
@@ -98,6 +100,7 @@ mod tests {
                 brake: Some(0.5),
                 steering_pct: Some(0.3),
                 yaw_rate_rps: Some(0.15), // Normal ratio: 0.15 / 0.3 = 0.5
+                speed_mps: Some(10.),
                 ..TelemetryData::default()
             };
             analyzer.analyze(&telemetry, &session_info);
@@ -108,6 +111,7 @@ mod tests {
             brake: Some(0.5),
             steering_pct: Some(0.3),
             yaw_rate_rps: Some(0.3), // Excessive: 0.3 / 0.3 = 1.0, which is 2x the baseline
+            speed_mps: Some(10.),
             ..TelemetryData::default()
         };
 
@@ -230,6 +234,7 @@ mod tests {
                 brake: Some(0.5),
                 steering_pct: Some(0.3),
                 yaw_rate_rps: Some(0.15),
+                speed_mps: Some(10.),
                 ..TelemetryData::default()
             };
             analyzer.analyze(&telemetry, &session_info);
@@ -249,6 +254,7 @@ mod tests {
             brake: Some(0.5),
             steering_pct: Some(0.3),
             yaw_rate_rps: Some(0.5),
+            speed_mps: Some(10.),
             ..TelemetryData::default()
         };
         let output = new_analyzer.analyze(&telemetry, &session_info);
@@ -308,6 +314,7 @@ mod tests {
                     brake: Some(baseline_brake),
                     steering_pct: Some(baseline_steering),
                     yaw_rate_rps: Some(baseline_yaw),
+                    speed_mps: Some(10.),
                     ..TelemetryData::default()
                 };
                 analyzer.analyze(&telemetry, &session_info);
@@ -319,6 +326,7 @@ mod tests {
                 brake: Some(baseline_brake),
                 steering_pct: Some(baseline_steering),
                 yaw_rate_rps: Some(excessive_yaw),
+                speed_mps: Some(10.),
                 ..TelemetryData::default()
             };
 

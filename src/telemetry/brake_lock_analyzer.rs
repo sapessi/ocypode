@@ -1,3 +1,5 @@
+use crate::telemetry::is_telemetry_point_analyzable;
+
 use super::{TelemetryAnalyzer, TelemetryAnnotation, TelemetryData};
 
 /// Minimum brake percentage to consider for brake lock detection
@@ -27,8 +29,8 @@ impl TelemetryAnalyzer for BrakeLockAnalyzer {
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
 
-        // Skip analysis if pit limiter is engaged (not at racing speed)
-        if telemetry.is_pit_limiter_engaged.unwrap_or(false) {
+        // Skip analysis if doesn't meet requirements
+        if !is_telemetry_point_analyzable(telemetry) {
             return output;
         }
 
@@ -106,6 +108,7 @@ mod tests {
         let telemetry = TelemetryData {
             brake: Some(0.5),
             is_abs_active: Some(false),
+            speed_mps: Some(10.),
             ..TelemetryData::default()
         };
         analyzer.analyze(&telemetry, &session_info);
@@ -114,6 +117,7 @@ mod tests {
         let telemetry = TelemetryData {
             brake: Some(0.8),
             is_abs_active: Some(true),
+            speed_mps: Some(10.),
             ..TelemetryData::default()
         };
 
@@ -171,6 +175,7 @@ mod tests {
         let telemetry = TelemetryData {
             brake: Some(0.5),
             is_abs_active: Some(false),
+            speed_mps: Some(10.),
             ..TelemetryData::default()
         };
         analyzer.analyze(&telemetry, &session_info);
@@ -180,6 +185,7 @@ mod tests {
             let telemetry = TelemetryData {
                 brake: Some(0.8),
                 is_abs_active: Some(true),
+                speed_mps: Some(10.),
                 ..TelemetryData::default()
             };
 
@@ -206,6 +212,7 @@ mod tests {
         let telemetry = TelemetryData {
             brake: Some(0.5),
             is_abs_active: Some(false),
+            speed_mps: Some(10.),
             ..TelemetryData::default()
         };
         analyzer.analyze(&telemetry, &session_info);
@@ -214,6 +221,7 @@ mod tests {
         let telemetry = TelemetryData {
             brake: Some(0.8),
             is_abs_active: Some(true),
+            speed_mps: Some(10.),
             ..TelemetryData::default()
         };
         let output = analyzer.analyze(&telemetry, &session_info);
@@ -223,6 +231,7 @@ mod tests {
         let telemetry = TelemetryData {
             brake: Some(0.1),
             is_abs_active: Some(false),
+            speed_mps: Some(10.),
             ..TelemetryData::default()
         };
         analyzer.analyze(&telemetry, &session_info);
@@ -231,6 +240,7 @@ mod tests {
         let telemetry = TelemetryData {
             brake: Some(0.5),
             is_abs_active: Some(false),
+            speed_mps: Some(10.),
             ..TelemetryData::default()
         };
         analyzer.analyze(&telemetry, &session_info);
@@ -239,6 +249,7 @@ mod tests {
         let telemetry = TelemetryData {
             brake: Some(0.8),
             is_abs_active: Some(true),
+            speed_mps: Some(10.),
             ..TelemetryData::default()
         };
         let output = analyzer.analyze(&telemetry, &session_info);
@@ -327,6 +338,7 @@ mod tests {
             let telemetry = TelemetryData {
                 brake: Some(brake_level),
                 is_abs_active: Some(false),
+                speed_mps: Some(10.),
                 ..TelemetryData::default()
             };
             analyzer.analyze(&telemetry, &session_info);
@@ -335,6 +347,7 @@ mod tests {
             let telemetry = TelemetryData {
                 brake: Some(brake_level),
                 is_abs_active: Some(true),
+                speed_mps: Some(10.),
                 ..TelemetryData::default()
             };
 

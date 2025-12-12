@@ -1,3 +1,5 @@
+use crate::telemetry::is_telemetry_point_analyzable;
+
 use super::{TelemetryAnalyzer, TelemetryData};
 
 pub(crate) const STEERING_ANGLE_DEADZONE_RAD: f32 = 0.08;
@@ -17,6 +19,11 @@ impl TelemetryAnalyzer for SlipAnalyzer {
         _session_info: &super::SessionInfo,
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
+
+        // Skip analysis if doesn't meet requirements
+        if !is_telemetry_point_analyzable(telemetry) {
+            return output;
+        }
 
         // Extract data from TelemetryData
         let brake = telemetry.brake.unwrap_or(0.0);

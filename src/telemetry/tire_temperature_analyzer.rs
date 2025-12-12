@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 
+use crate::telemetry::is_telemetry_point_analyzable;
+
 use super::{TelemetryAnalyzer, TelemetryAnnotation, TelemetryData};
 
 /// Optimal tire temperature range (in Celsius)
@@ -130,8 +132,8 @@ impl TelemetryAnalyzer for TireTemperatureAnalyzer {
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
 
-        // Skip analysis if pit limiter is engaged (not at racing speed)
-        if telemetry.is_pit_limiter_engaged.unwrap_or(false) {
+        // Skip analysis if doesn't meet requirements
+        if !is_telemetry_point_analyzable(telemetry) {
             return output;
         }
 
@@ -207,6 +209,7 @@ mod tests {
             rf_tire_info: Some(tire_info.clone()),
             lr_tire_info: Some(tire_info.clone()),
             rr_tire_info: Some(tire_info),
+            speed_mps: Some(10.),
             ..TelemetryData::default()
         }
     }

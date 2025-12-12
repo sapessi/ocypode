@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use simple_moving_average::{SMA, SumTreeSMA};
 
+use crate::telemetry::is_telemetry_point_analyzable;
+
 use super::{SessionInfo, TelemetryAnalyzer, TelemetryAnnotation, TelemetryData};
 
 pub struct WheelspinAnalyzer<const WINDOW_SIZE: usize> {
@@ -29,6 +31,11 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for WheelspinAnalyzer<WINDOW_SI
     fn analyze(&mut self, telemetry: &TelemetryData, _: &SessionInfo) -> Vec<TelemetryAnnotation> {
         // process expected RPM growth by gear
         let mut output = Vec::new();
+
+        // Skip analysis if doesn't meet requirements
+        if !is_telemetry_point_analyzable(telemetry) {
+            return output;
+        }
 
         // Extract data from TelemetryData
         let cur_gear = telemetry.gear.unwrap_or(0).max(0) as u32;

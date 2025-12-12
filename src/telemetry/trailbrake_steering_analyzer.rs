@@ -1,3 +1,5 @@
+use crate::telemetry::is_telemetry_point_analyzable;
+
 use super::{SessionInfo, TelemetryAnalyzer, TelemetryData};
 
 pub(crate) const MIN_TRAILBRAKING_PCT: f32 = 0.2;
@@ -24,6 +26,11 @@ impl TelemetryAnalyzer for TrailbrakeSteeringAnalyzer {
         session_info: &SessionInfo,
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
+
+        // Skip analysis if doesn't meet requirements
+        if !is_telemetry_point_analyzable(telemetry) {
+            return output;
+        }
 
         // Extract brake and steering data from TelemetryData
         let brake = telemetry.brake.unwrap_or(0.0);

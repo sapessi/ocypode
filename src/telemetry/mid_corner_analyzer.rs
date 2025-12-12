@@ -1,5 +1,7 @@
 use simple_moving_average::{SMA, SumTreeSMA};
 
+use crate::telemetry::is_telemetry_point_analyzable;
+
 use super::{TelemetryAnalyzer, TelemetryAnnotation, TelemetryData};
 
 /// Maximum throttle percentage to consider for mid-corner coasting detection
@@ -37,8 +39,8 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for MidCornerAnalyzer<WINDOW_SI
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
 
-        // Skip analysis if pit limiter is engaged (not at racing speed)
-        if telemetry.is_pit_limiter_engaged.unwrap_or(false) {
+        // Skip analysis if doesn't meet requirements
+        if !is_telemetry_point_analyzable(telemetry) {
             return output;
         }
 

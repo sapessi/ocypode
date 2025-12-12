@@ -692,6 +692,10 @@ pub trait TelemetryAnalyzer {
     ) -> Vec<TelemetryAnnotation>;
 }
 
+pub(crate) fn is_telemetry_point_analyzable(data: &TelemetryData) -> bool {
+    !data.is_pit_limiter_engaged.unwrap_or(false) && data.speed_mps.unwrap_or(0.) > 0.
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

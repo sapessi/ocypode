@@ -1,5 +1,7 @@
 use simple_moving_average::{SMA, SumTreeSMA};
 
+use crate::telemetry::is_telemetry_point_analyzable;
+
 use super::{TelemetryAnalyzer, TelemetryAnnotation, TelemetryData};
 
 /// only look for scrubbing or collect data points when steering is > than this %
@@ -28,6 +30,11 @@ impl<const WINDOW_SIZE: usize> TelemetryAnalyzer for ScrubAnalyzer<WINDOW_SIZE> 
         _session_info: &super::SessionInfo,
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
+
+        // Skip analysis if doesn't meet requirements
+        if !is_telemetry_point_analyzable(telemetry) {
+            return output;
+        }
 
         // Extract data from TelemetryData
         let brake = telemetry.brake.unwrap_or(0.0);

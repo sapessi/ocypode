@@ -1,3 +1,5 @@
+use crate::telemetry::is_telemetry_point_analyzable;
+
 use super::{TelemetryAnalyzer, TelemetryAnnotation, TelemetryData};
 
 /// Minimum pitch change (in radians) to consider for bottoming out detection
@@ -29,8 +31,8 @@ impl TelemetryAnalyzer for BottomingOutAnalyzer {
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
 
-        // Skip analysis if pit limiter is engaged (not at racing speed)
-        if telemetry.is_pit_limiter_engaged.unwrap_or(false) {
+        // Skip analysis if doesn't meet requirements
+        if !is_telemetry_point_analyzable(telemetry) {
             return output;
         }
 

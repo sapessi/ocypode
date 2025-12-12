@@ -1,5 +1,7 @@
 use std::default;
 
+use crate::telemetry::is_telemetry_point_analyzable;
+
 use super::{TelemetryAnalyzer, TelemetryAnnotation, TelemetryData};
 
 const DEFAULT_SHORT_SHIFT_SENSITIVITY: f32 = 100.;
@@ -27,6 +29,11 @@ impl TelemetryAnalyzer for ShortShiftingAnalyzer {
         _session_info: &super::SessionInfo,
     ) -> Vec<super::TelemetryAnnotation> {
         let mut output = Vec::new();
+
+        // Skip analysis if doesn't meet requirements
+        if !is_telemetry_point_analyzable(telemetry) {
+            return output;
+        }
 
         // Extract data from TelemetryData
         let cur_gear = telemetry.gear.unwrap_or(0);
@@ -66,6 +73,7 @@ mod tests {
             gear: Some(2),
             engine_rpm: Some(5000.0),
             shift_point_rpm: Some(6200.0),
+            speed_mps: Some(10.),
             ..create_default_telemetry()
         };
         let session_info = SessionInfo::default();
@@ -77,6 +85,7 @@ mod tests {
             gear: Some(3),
             engine_rpm: Some(5100.0),
             shift_point_rpm: Some(6200.0),
+            speed_mps: Some(10.),
             ..create_default_telemetry()
         };
         output = analyzer.analyze(&telemetry_data2, &session_info);
