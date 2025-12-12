@@ -1,6 +1,6 @@
 # Ocypode
 
-I like Rust and I like sim racing. These two passions meet in this little project to read racing simulation telemetry, display it live, and provide helpful alerts to improve driving skills in real-time. In case you are wondering, [Ocypodes are the fastest crabs](https://en.wikipedia.org/wiki/Ocypode).
+I like Rust and I like sim racing. These two passions meet in this little project to read racing simulation telemetry, display it live, provide helpful alerts to improve driving skills in real-time, and suggest car setup changes. In case you are wondering, [Ocypodes are the fastest crabs](https://en.wikipedia.org/wiki/Ocypode).
 
 ![Live telemetry with alerts screenshot](/screenshots/mazda_slip.png)
 
