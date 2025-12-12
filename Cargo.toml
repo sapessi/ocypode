@@ -1,8 +1,17 @@
 [package]
 name = "ocypode"
+description = "Ocypode reads racing simulation telemetry, displays it live, provides helpful alerts to improve driving skills in real-time, and suggests car setup changes."
 version = "0.1.0"
 edition = "2024"
 repository = "https://github.com/sapessi/ocypode"
+authors = [ "Stefano Buliani" ]
+license = "APACHE-2.0"
+
+[package.metadata.wix]
+upgrade-guid = "C56C8325-A8F8-4866-93A2-9292F02E5DC3"
+path-guid = "8E7867C0-D8CB-4CD8-BA03-BB367E02CD8A"
+license = false
+eula = false
 
 [[bin]]
 name = "ocypode"

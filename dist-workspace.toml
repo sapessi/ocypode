@@ -1,6 +1,10 @@
 [workspace]
 members = ["cargo:."]
 
+[dist.github-custom-runners]
+global = "ubuntu-latest"
+x86_64-pc-windows-msvc = "windows-latest"
+
 # Config for 'dist'
 [dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
@@ -8,6 +12,6 @@ cargo-dist-version = "0.28.0"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
-installers = []
+installers = ["msi"]
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-pc-windows-msvc", "x86_64-pc-windows-msvc"]
+targets = ["x86_64-pc-windows-msvc"]
