@@ -1,6 +1,7 @@
 # Ocypode
-
-![Ocypode telemetry logo](/assets/ocypode_logo_small.png)
+<p align="center">
+  <img src="https://github.com/sapessi/ocypode/raw/main/assets/ocypode_logo_small.png" alt="Ocypode telemetry" />
+</p>
 
 I like Rust and I like sim racing. These two passions meet in this little project to read racing simulation telemetry, display it live, provide helpful alerts to improve driving skills in real-time, and suggest car setup changes. In case you are wondering, [Ocypodes are the fastest crabs](https://en.wikipedia.org/wiki/Ocypode).
 
