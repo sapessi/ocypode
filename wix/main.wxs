@@ -131,6 +131,27 @@
                     </Directory>
                 </Directory>
             </Directory>
+
+            <Directory Id="DesktopFolder" Name="Desktop">
+                <Component Id="ApplicationShortcutDesktop" Guid="*">
+                    <Shortcut Id="ApplicationDesktopShortcut"
+                        Name="Ocypode"
+                        Description="Ocypode telemetry analyzer"
+                        Target="&quot;[Bin]ocypode&quot; live --game acc"
+                        WorkingDirectory="Bin">
+                        <Icon Id='ShortcutIcon' SourceFile='assets\ocypode_icon_256.ico'/>
+                    </Shortcut>
+                    <RemoveFolder Id="DesktopFolder" On="uninstall"/>
+                    <RegistryValue
+                        Root="HKCU"
+                        Key="Software\StefanoBuliani\Ocypode"
+                        Name="installed"
+                        Type="integer"
+                        Value="1"
+                        KeyPath="yes"/>
+                </Component>
+            </Directory>
+
         </Directory>
 
         <Feature
@@ -159,6 +180,8 @@
                 Absent='allow'>
                 <ComponentRef Id='Path'/>
             </Feature>
+
+            <ComponentRef Id="ApplicationShortcutDesktop" />
         </Feature>
 
         <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
@@ -170,8 +193,8 @@
           The product icon is the graphic that appears in the Add/Remove
           Programs control panel for the application.
         -->
-        <!--<Icon Id='ProductICO' SourceFile='wix\Product.ico'/>-->
-        <!--<Property Id='ARPPRODUCTICON' Value='ProductICO' />-->
+        <Icon Id='ProductICO' SourceFile='assets\ocypode_icon_256.ico'/>
+        <Property Id='ARPPRODUCTICON' Value='ProductICO' />
 
         <Property Id='ARPHELPLINK' Value='https://github.com/sapessi/ocypode'/>
         
@@ -221,7 +244,7 @@
 
           The dialog BMP dimensions are 493 x 312 pixels.
         -->
-        <!--<WixVariable Id='WixUIDialogBmp' Value='wix\Dialog.bmp'/>-->
+        <WixVariable Id='WixUIDialogBmp' Value='assets\ocypode_installer_banner.bmp'/>
 
     </Product>
 

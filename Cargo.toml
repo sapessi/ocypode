@@ -62,3 +62,4 @@ harness = false
 [profile.dist]
 inherits = "release"
 lto = "thin"
+allow-dirty = ["ci"]
