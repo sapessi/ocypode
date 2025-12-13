@@ -33,7 +33,9 @@ use std::io::BufRead;
 /// - `game_source`: The source game (e.g., "IRacing" or "ACC")
 /// - Vehicle state: `gear`, `speed_mps`, `engine_rpm`, `max_engine_rpm`, `shift_point_rpm`
 /// - Inputs: `throttle`, `brake`, `clutch`, `steering_angle_rad`, `steering_pct`
-/// - Position data: `lap_distance_m`, `lap_distance_pct`, `lap_number`
+/// - Position data: `lap_distance_m`, `lap_distance_pct`, `lap_number`, `track_position_pct`, `track_sector`
+/// - World coordinates: `world_position_x`, `world_position_y`, `world_position_z`
+/// - World velocity: `world_velocity_x`, `world_velocity_y`, `world_velocity_z`
 /// - Timing: `last_lap_time_s`, `best_lap_time_s`
 /// - Flags: `is_pit_limiter_engaged`, `is_in_pit_lane`, `is_abs_active`
 /// - GPS (iRacing only): `latitude_deg`, `longitude_deg`

@@ -337,6 +337,34 @@ The Setup Assistant also uses these existing analyzers:
 
 **Classification**: Maps to Excessive Trailbraking
 
+### Short Shifting Analyzer
+
+**Purpose**: Detects when the driver shifts gears before reaching the optimal RPM.
+
+**File**: `src/telemetry/short_shifting_analyzer.rs`
+
+**Configuration Constants**:
+```rust
+const DEFAULT_SHORT_SHIFT_SENSITIVITY: f32 = 100.0;  // RPM tolerance below optimal
+```
+
+**Game-Specific Behavior**:
+- **iRacing**: Uses game-provided `shift_point_rpm` when available
+- **ACC**: `shift_point_rpm` is automatically populated during telemetry conversion as 87% of `max_engine_rpm` since ACC doesn't provide shift point data through the simetry API
+
+**Detection Logic**:
+1. Tracks previous gear and RPM
+2. Detects gear upshifts (current gear > previous gear)
+3. Compares shift RPM to `shift_point_rpm` from telemetry data
+4. Triggers if shift occurred more than 100 RPM below optimal
+
+**Telemetry Requirements**:
+- `gear`: Current gear number
+- `engine_rpm`: Current engine RPM
+- `shift_point_rpm`: Optimal shift point (provided by iRacing, estimated for ACC)
+
+**Classification**: Not mapped to setup issues (shifting technique, not setup)
+
 ## Performance Considerations
 
 ### Analyzer Performance

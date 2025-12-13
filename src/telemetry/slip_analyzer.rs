@@ -2,7 +2,7 @@ use crate::telemetry::is_telemetry_point_analyzable;
 
 use super::{TelemetryAnalyzer, TelemetryData};
 
-pub(crate) const STEERING_ANGLE_DEADZONE_RAD: f32 = 0.08;
+pub(crate) const STEERING_ANGLE_DEADZONE_RAD: f32 = 0.12; // Increased from 0.08 to reduce sensitivity
 
 #[derive(Default)]
 pub(crate) struct SlipAnalyzer {
@@ -31,10 +31,14 @@ impl TelemetryAnalyzer for SlipAnalyzer {
         let steering = telemetry.steering_angle_rad.unwrap_or(0.0).abs();
         let cur_speed = telemetry.speed_mps.unwrap_or(0.0);
 
+        // Require more significant speed loss to reduce false positives
+        const MIN_SPEED_LOSS_MPS: f32 = 0.5; // ~1.8 km/h minimum speed loss
+
         if brake == 0.
             && throttle >= self.prev_throttle
             && steering > STEERING_ANGLE_DEADZONE_RAD
             && cur_speed < self.prev_speed
+            && (self.prev_speed - cur_speed) >= MIN_SPEED_LOSS_MPS
         {
             output.push(super::TelemetryAnnotation::Slip {
                 prev_speed: self.prev_speed,
@@ -55,7 +59,7 @@ impl TelemetryAnalyzer for SlipAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::telemetry::{GameSource, SessionInfo, TelemetryAnnotation, TelemetryData};
+    use crate::telemetry::{SessionInfo, TelemetryAnnotation, TelemetryData};
 
     #[test]
     fn test_slip_annotation_inserted() {
@@ -74,7 +78,7 @@ mod tests {
         analyzer.prev_speed = 55.0;
 
         let output = analyzer.analyze(&telemetry_data, &session_info);
-        // Should produce slip annotation: brake=0, throttle increasing, steering > deadzone, speed decreasing
+        // Should produce slip annotation: brake=0, throttle increasing, steering > deadzone, speed decreasing by >0.5 m/s
         assert_eq!(output.len(), 1);
         match &output[0] {
             TelemetryAnnotation::Slip {
@@ -131,6 +135,26 @@ mod tests {
     }
 
     #[test]
+    fn test_no_slip_annotation_due_to_insufficient_speed_loss() {
+        let mut analyzer = SlipAnalyzer::default();
+        let telemetry_data = TelemetryData {
+            throttle: Some(0.5),
+            brake: Some(0.0),
+            speed_mps: Some(54.8), // Only 0.2 m/s loss, below 0.5 threshold
+            steering_angle_rad: Some(0.15),
+            ..create_default_telemetry()
+        };
+        let session_info = SessionInfo::default();
+
+        // Initial state
+        analyzer.prev_throttle = 0.4;
+        analyzer.prev_speed = 55.0;
+
+        let output = analyzer.analyze(&telemetry_data, &session_info);
+        assert!(output.is_empty());
+    }
+
+    #[test]
     fn test_no_slip_annotation_due_to_low_steering() {
         let mut analyzer = SlipAnalyzer::default();
         let telemetry_data = TelemetryData {
@@ -152,9 +176,6 @@ mod tests {
 
     fn create_default_telemetry() -> TelemetryData {
         TelemetryData {
-            point_no: 0,
-            timestamp_ms: 0,
-            game_source: GameSource::IRacing,
             gear: Some(1),
             speed_mps: Some(0.0),
             engine_rpm: Some(0.0),
@@ -163,31 +184,7 @@ mod tests {
             throttle: Some(0.0),
             brake: Some(0.0),
             clutch: Some(0.0),
-            steering_angle_rad: None,
-            steering_pct: None,
-            lap_distance_m: None,
-            lap_distance_pct: None,
-            lap_number: None,
-            last_lap_time_s: None,
-            best_lap_time_s: None,
-            is_pit_limiter_engaged: None,
-            is_in_pit_lane: None,
-            is_abs_active: None,
-            latitude_deg: None,
-            longitude_deg: None,
-            lateral_accel_mps2: None,
-            longitudinal_accel_mps2: None,
-            pitch_rad: None,
-            pitch_rate_rps: None,
-            roll_rad: None,
-            roll_rate_rps: None,
-            yaw_rad: None,
-            yaw_rate_rps: None,
-            lf_tire_info: None,
-            rf_tire_info: None,
-            lr_tire_info: None,
-            rr_tire_info: None,
-            annotations: Vec::new(),
+            ..Default::default()
         }
     }
 }

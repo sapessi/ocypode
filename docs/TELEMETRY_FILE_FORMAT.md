@@ -286,9 +286,15 @@ Some telemetry fields are only available from specific racing simulations:
 - `roll_rate_rps` - Roll rate of change
 - `yaw_rate_rps` - Yaw rate of change
 
+**ACC-specific fields:**
+- World position coordinates (`world_position_x`, `world_position_y`, `world_position_z`) from car coordinates
+- World velocity vectors (`world_velocity_x`, `world_velocity_y`, `world_velocity_z`) from local velocity
+- Track position percentage (`track_position_pct`) from normalized car position
+
 **ACC-specific limitations:**
 - GPS coordinates are not available (set to `null`)
 - Absolute lap distance is not available (set to `null`)
+- Track sector information is not available (set to `null`)
 - Rate data (pitch/roll/yaw rates) are not available (set to `null`)
 
 **Note:** Due to limitations in the simetry 0.2.3 library, some iRacing-specific fields may not be populated even though the game provides them. Future versions may expose additional fields through direct game API access.

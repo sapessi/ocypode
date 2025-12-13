@@ -271,7 +271,7 @@ impl SetupAssistant {
                 let is_speed_decreasing = cur_speed < prev_speed;
 
                 const MIN_BRAKE_THRESHOLD: f32 = 0.1;
-                const MIN_THROTTLE_THRESHOLD: f32 = 0.1;
+                const MIN_THROTTLE_THRESHOLD: f32 = 0.2; // Increased from 0.1 to reduce sensitivity
 
                 // Slip during braking = corner entry understeer
                 if brake > MIN_BRAKE_THRESHOLD {
@@ -292,10 +292,21 @@ impl SetupAssistant {
                 }
             }
 
-            // Wheelspin indicates corner exit power oversteer
+            // Wheelspin indicates corner exit power oversteer only when cornering
             TelemetryAnnotation::Wheelspin { is_wheelspin, .. } => {
                 if *is_wheelspin {
-                    Some(FindingType::CornerExitPowerOversteer)
+                    // Only classify as power oversteer if there's significant steering input
+                    // and we're in the corner exit phase
+                    const MIN_STEERING_FOR_OVERSTEER: f32 = 0.05;
+                    let steering = telemetry.steering_pct.unwrap_or(0.0).abs();
+                    let corner_phase = Self::classify_corner_phase(telemetry);
+
+                    if steering > MIN_STEERING_FOR_OVERSTEER && corner_phase == CornerPhase::Exit {
+                        Some(FindingType::CornerExitPowerOversteer)
+                    } else {
+                        // Wheelspin in straights or without steering is just wheelspin, not oversteer
+                        None
+                    }
                 } else {
                     None
                 }
@@ -582,6 +593,9 @@ mod tests {
 
         // Add some findings
         let telemetry = TelemetryData {
+            throttle: Some(0.8),      // Throttle for corner exit
+            steering_pct: Some(0.15), // Steering input for cornering
+            brake: Some(0.0),         // No braking
             annotations: vec![
                 TelemetryAnnotation::Scrub {
                     avg_yaw_rate_change: 0.5,
@@ -839,11 +853,17 @@ mod tests {
     }
 
     #[test]
-    fn test_wheelspin_maps_to_power_oversteer() {
+    fn test_wheelspin_maps_to_power_oversteer_when_cornering() {
         use crate::telemetry::{TelemetryAnnotation, TelemetryData};
         use std::collections::HashMap;
 
-        let telemetry = TelemetryData::default();
+        // Test case 1: Wheelspin during corner exit (throttle + steering) should map to power oversteer
+        let telemetry_corner_exit = TelemetryData {
+            throttle: Some(0.8),      // Throttle application
+            steering_pct: Some(0.15), // Significant steering input
+            brake: Some(0.0),         // No braking
+            ..TelemetryData::default()
+        };
 
         let annotation = TelemetryAnnotation::Wheelspin {
             avg_rpm_increase_per_gear: HashMap::new(),
@@ -852,8 +872,33 @@ mod tests {
             is_wheelspin: true,
         };
 
-        let finding_type = SetupAssistant::annotation_to_finding_type(&annotation, &telemetry);
+        let finding_type =
+            SetupAssistant::annotation_to_finding_type(&annotation, &telemetry_corner_exit);
         assert_eq!(finding_type, Some(FindingType::CornerExitPowerOversteer));
+
+        // Test case 2: Wheelspin on straight (no steering) should NOT map to power oversteer
+        let telemetry_straight = TelemetryData {
+            throttle: Some(0.8),      // Throttle application
+            steering_pct: Some(0.02), // Minimal steering (straight line)
+            brake: Some(0.0),         // No braking
+            ..TelemetryData::default()
+        };
+
+        let finding_type_straight =
+            SetupAssistant::annotation_to_finding_type(&annotation, &telemetry_straight);
+        assert_eq!(finding_type_straight, None); // Should not be classified as oversteer
+
+        // Test case 3: Wheelspin during braking (entry phase) should NOT map to power oversteer
+        let telemetry_entry = TelemetryData {
+            throttle: Some(0.0),      // No throttle
+            steering_pct: Some(0.15), // Steering input
+            brake: Some(0.6),         // Braking
+            ..TelemetryData::default()
+        };
+
+        let finding_type_entry =
+            SetupAssistant::annotation_to_finding_type(&annotation, &telemetry_entry);
+        assert_eq!(finding_type_entry, None); // Should not be classified as power oversteer
     }
 
     #[test]
@@ -905,6 +950,9 @@ mod tests {
 
         // Add some findings through telemetry processing
         let telemetry = TelemetryData {
+            throttle: Some(0.8),      // Throttle for corner exit
+            steering_pct: Some(0.15), // Steering input for cornering
+            brake: Some(0.0),         // No braking
             annotations: vec![
                 TelemetryAnnotation::Scrub {
                     avg_yaw_rate_change: 0.5,
@@ -1047,6 +1095,9 @@ mod tests {
 
         // Simulate a session with multiple findings
         let telemetry = TelemetryData {
+            throttle: Some(0.8),      // Throttle for corner exit
+            steering_pct: Some(0.15), // Steering input for cornering
+            brake: Some(0.0),         // No braking
             annotations: vec![
                 TelemetryAnnotation::Scrub {
                     avg_yaw_rate_change: 0.5,
@@ -1356,7 +1407,7 @@ mod proptests {
             let finding_type = SetupAssistant::annotation_to_finding_type(&annotation, &telemetry);
 
             const MIN_BRAKE_THRESHOLD: f32 = 0.1;
-            const MIN_THROTTLE_THRESHOLD: f32 = 0.1;
+            const MIN_THROTTLE_THRESHOLD: f32 = 0.2; // Updated to match the new threshold
 
             let is_speed_decreasing = cur_speed < prev_speed;
 
