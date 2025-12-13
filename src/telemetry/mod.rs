@@ -214,6 +214,20 @@ pub struct TelemetryData {
     pub lap_distance_pct: Option<f32>,
     pub lap_number: Option<u32>,
 
+    // Car position in world coordinates (3D space)
+    pub world_position_x: Option<f32>,
+    pub world_position_y: Option<f32>,
+    pub world_position_z: Option<f32>,
+
+    // Car velocity in world coordinates
+    pub world_velocity_x: Option<f32>,
+    pub world_velocity_y: Option<f32>,
+    pub world_velocity_z: Option<f32>,
+
+    // Track position information
+    pub track_position_pct: Option<f32>, // Alternative to lap_distance_pct for consistency
+    pub track_sector: Option<u8>,        // Current track sector (1, 2, or 3)
+
     // Timing
     pub last_lap_time_s: Option<f32>,
     pub best_lap_time_s: Option<f32>,
@@ -271,6 +285,14 @@ impl Default for TelemetryData {
             lap_distance_m: None,
             lap_distance_pct: None,
             lap_number: None,
+            world_position_x: None,
+            world_position_y: None,
+            world_position_z: None,
+            world_velocity_x: None,
+            world_velocity_y: None,
+            world_velocity_z: None,
+            track_position_pct: None,
+            track_sector: None,
             last_lap_time_s: None,
             best_lap_time_s: None,
             is_pit_limiter_engaged: None,
@@ -308,12 +330,14 @@ impl TelemetryData {
     /// - Inputs (throttle, brake, clutch)
     /// - Flags (pit limiter, pit lane)
     ///
-    /// Fields not available (set to None):
+    /// Fields not available through current simetry API (set to None):
     /// - Steering angle and percentage
     /// - Lap distance and position data
+    /// - World position coordinates (world_position_x, world_position_y, world_position_z)
+    /// - Track sector information (track_sector)
     /// - Lap times
     /// - ABS status
-    /// - GPS coordinates
+    /// - GPS coordinates (latitude_deg, longitude_deg)
     /// - Acceleration data
     /// - Orientation (pitch, roll, yaw) and rates
     /// - Tire temperatures
@@ -365,6 +389,17 @@ impl TelemetryData {
         let lap_distance_m = None;
         let lap_distance_pct = None;
         let lap_number = None;
+
+        // World position and velocity data (not available through simetry 0.2.3)
+        let world_position_x = None;
+        let world_position_y = None;
+        let world_position_z = None;
+        let world_velocity_x = None;
+        let world_velocity_y = None;
+        let world_velocity_z = None;
+        let track_position_pct = None;
+        let track_sector = None;
+
         let last_lap_time_s = None;
         let best_lap_time_s = None;
         let is_abs_active = None;
@@ -400,6 +435,14 @@ impl TelemetryData {
             lap_distance_m,
             lap_distance_pct,
             lap_number,
+            world_position_x,
+            world_position_y,
+            world_position_z,
+            world_velocity_x,
+            world_velocity_y,
+            world_velocity_z,
+            track_position_pct,
+            track_sector,
             last_lap_time_s,
             best_lap_time_s,
             is_pit_limiter_engaged,
@@ -443,11 +486,17 @@ impl TelemetryData {
     /// - Lap number
     /// - Lap times
     ///
-    /// Fields not available in ACC (set to None):
+    /// Fields not available in ACC through current simetry API (set to None):
     /// - GPS coordinates (latitude_deg, longitude_deg)
     /// - Absolute lap distance (lap_distance_m)
+    /// - Track sector information (track_sector)
     /// - Rate data (pitch_rate_rps, roll_rate_rps, yaw_rate_rps)
     /// - Acceleration data (lateral_accel_mps2, longitudinal_accel_mps2)
+    ///
+    /// Fields available in ACC:
+    /// - World position coordinates (world_position_x, world_position_y, world_position_z) from car_coordinates
+    /// - World velocity (world_velocity_x, world_velocity_y, world_velocity_z) from local_velocity
+    /// - Track position percentage (track_position_pct) from normalized_car_position
     #[cfg(windows)]
     pub fn from_acc_state(
         state: &simetry::assetto_corsa_competizione::SimState,
@@ -498,6 +547,33 @@ impl TelemetryData {
         let lap_distance_m = None; // ACC doesn't provide absolute lap distance
         let lap_distance_pct = Some(state.graphics.normalized_car_position);
         let lap_number = Some(state.graphics.completed_laps as u32);
+
+        // Extract world position from ACC graphics (car coordinates in world space)
+        // Access the first car's coordinates (assuming it's the player car)
+        let world_position_x = state
+            .graphics
+            .car_coordinates
+            .get(&state.graphics.player_car_id)
+            .map(|coords| coords.x);
+        let world_position_y = state
+            .graphics
+            .car_coordinates
+            .get(&state.graphics.player_car_id)
+            .map(|coords| coords.y);
+        let world_position_z = state
+            .graphics
+            .car_coordinates
+            .get(&state.graphics.player_car_id)
+            .map(|coords| coords.z);
+
+        // Extract world velocity from ACC physics (local velocity in car coordinate system)
+        let world_velocity_x = Some(state.physics.local_velocity.x);
+        let world_velocity_y = Some(state.physics.local_velocity.y);
+        let world_velocity_z = Some(state.physics.local_velocity.z);
+
+        // Track position information
+        let track_position_pct = Some(state.graphics.normalized_car_position); // Same as lap_distance_pct
+        let track_sector = None; // ACC doesn't expose current sector directly
 
         // Extract lap times from ACC graphics
         let last_lap_time_s = {
@@ -597,6 +673,14 @@ impl TelemetryData {
             lap_distance_m,
             lap_distance_pct,
             lap_number,
+            world_position_x,
+            world_position_y,
+            world_position_z,
+            world_velocity_x,
+            world_velocity_y,
+            world_velocity_z,
+            track_position_pct,
+            track_sector,
             last_lap_time_s,
             best_lap_time_s,
             is_pit_limiter_engaged,
@@ -741,6 +825,14 @@ mod tests {
             lap_distance_m: Some(1234.5),
             lap_distance_pct: Some(0.75),
             lap_number: Some(5),
+            world_position_x: Some(100.0),
+            world_position_y: Some(200.0),
+            world_position_z: Some(10.0),
+            world_velocity_x: Some(15.0),
+            world_velocity_y: Some(25.0),
+            world_velocity_z: Some(2.0),
+            track_position_pct: Some(0.75),
+            track_sector: Some(2),
             last_lap_time_s: Some(92.5),
             best_lap_time_s: Some(90.2),
             is_pit_limiter_engaged: Some(false),
@@ -787,6 +879,17 @@ mod tests {
             telemetry.steering_angle_rad
         );
         assert_eq!(deserialized.lap_distance_m, telemetry.lap_distance_m);
+        assert_eq!(deserialized.world_position_x, telemetry.world_position_x);
+        assert_eq!(deserialized.world_position_y, telemetry.world_position_y);
+        assert_eq!(deserialized.world_position_z, telemetry.world_position_z);
+        assert_eq!(deserialized.world_velocity_x, telemetry.world_velocity_x);
+        assert_eq!(deserialized.world_velocity_y, telemetry.world_velocity_y);
+        assert_eq!(deserialized.world_velocity_z, telemetry.world_velocity_z);
+        assert_eq!(
+            deserialized.track_position_pct,
+            telemetry.track_position_pct
+        );
+        assert_eq!(deserialized.track_sector, telemetry.track_sector);
         assert_eq!(deserialized.latitude_deg, telemetry.latitude_deg);
         assert_eq!(deserialized.longitude_deg, telemetry.longitude_deg);
         assert_eq!(deserialized.yaw_rate_rps, telemetry.yaw_rate_rps);
@@ -812,6 +915,14 @@ mod tests {
             lap_distance_m: None,
             lap_distance_pct: None,
             lap_number: None,
+            world_position_x: None,
+            world_position_y: None,
+            world_position_z: None,
+            world_velocity_x: None,
+            world_velocity_y: None,
+            world_velocity_z: None,
+            track_position_pct: None,
+            track_sector: None,
             last_lap_time_s: None,
             best_lap_time_s: None,
             is_pit_limiter_engaged: None,
@@ -907,6 +1018,14 @@ mod tests {
             "lap_distance_m": null,
             "lap_distance_pct": null,
             "lap_number": null,
+            "world_position_x": null,
+            "world_position_y": null,
+            "world_position_z": null,
+            "world_velocity_x": null,
+            "world_velocity_y": null,
+            "world_velocity_z": null,
+            "track_position_pct": null,
+            "track_sector": null,
             "last_lap_time_s": null,
             "best_lap_time_s": null,
             "is_pit_limiter_engaged": null,
@@ -1007,6 +1126,14 @@ mod tests {
             lap_distance_m: None,
             lap_distance_pct: Some(0.5),
             lap_number: Some(10),
+            world_position_x: Some(50.0),
+            world_position_y: None,
+            world_position_z: Some(5.0),
+            world_velocity_x: None,
+            world_velocity_y: Some(10.0),
+            world_velocity_z: None,
+            track_position_pct: Some(0.5),
+            track_sector: None,
             last_lap_time_s: None,
             best_lap_time_s: None,
             is_pit_limiter_engaged: Some(false),

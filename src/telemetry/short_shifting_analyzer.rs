@@ -204,9 +204,6 @@ mod tests {
 
     fn create_default_telemetry() -> TelemetryData {
         TelemetryData {
-            point_no: 0,
-            timestamp_ms: 0,
-            game_source: GameSource::IRacing,
             gear: Some(1),
             speed_mps: Some(0.0),
             engine_rpm: Some(0.0),
@@ -215,31 +212,7 @@ mod tests {
             throttle: Some(0.0),
             brake: Some(0.0),
             clutch: Some(0.0),
-            steering_angle_rad: None,
-            steering_pct: None,
-            lap_distance_m: None,
-            lap_distance_pct: None,
-            lap_number: None,
-            last_lap_time_s: None,
-            best_lap_time_s: None,
-            is_pit_limiter_engaged: None,
-            is_in_pit_lane: None,
-            is_abs_active: None,
-            latitude_deg: None,
-            longitude_deg: None,
-            lateral_accel_mps2: None,
-            longitudinal_accel_mps2: None,
-            pitch_rad: None,
-            pitch_rate_rps: None,
-            roll_rad: None,
-            roll_rate_rps: None,
-            yaw_rad: None,
-            yaw_rate_rps: None,
-            lf_tire_info: None,
-            rf_tire_info: None,
-            lr_tire_info: None,
-            rr_tire_info: None,
-            annotations: Vec::new(),
+            ..Default::default()
         }
     }
 }
