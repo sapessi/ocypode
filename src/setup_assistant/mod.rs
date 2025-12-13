@@ -271,7 +271,7 @@ impl SetupAssistant {
                 let is_speed_decreasing = cur_speed < prev_speed;
 
                 const MIN_BRAKE_THRESHOLD: f32 = 0.1;
-                const MIN_THROTTLE_THRESHOLD: f32 = 0.1;
+                const MIN_THROTTLE_THRESHOLD: f32 = 0.2; // Increased from 0.1 to reduce sensitivity
 
                 // Slip during braking = corner entry understeer
                 if brake > MIN_BRAKE_THRESHOLD {
@@ -1407,7 +1407,7 @@ mod proptests {
             let finding_type = SetupAssistant::annotation_to_finding_type(&annotation, &telemetry);
 
             const MIN_BRAKE_THRESHOLD: f32 = 0.1;
-            const MIN_THROTTLE_THRESHOLD: f32 = 0.1;
+            const MIN_THROTTLE_THRESHOLD: f32 = 0.2; // Updated to match the new threshold
 
             let is_speed_decreasing = cur_speed < prev_speed;
 
