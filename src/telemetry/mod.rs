@@ -18,6 +18,10 @@ use std::{
 };
 
 pub use collector::collect_telemetry;
+
+/// For ACC, estimate optimal shift point as a percentage of max RPM
+/// Most cars benefit from shifting around 85-92% of max RPM for optimal power
+const ACC_OPTIMAL_SHIFT_PCT: f32 = 0.92;
 use serde::{Deserialize, Serialize};
 use simetry::Moment;
 
@@ -471,7 +475,12 @@ impl TelemetryData {
             .map(|rpm| rpm.get::<revolution_per_minute>() as f32);
         let shift_point_rpm = state
             .shift_point()
-            .map(|rpm| rpm.get::<revolution_per_minute>() as f32);
+            .map(|rpm| rpm.get::<revolution_per_minute>() as f32)
+            .or_else(|| {
+                // ACC doesn't provide shift_point through simetry API
+                // Estimate optimal shift point as percentage of max RPM
+                max_engine_rpm.map(|max_rpm| max_rpm * ACC_OPTIMAL_SHIFT_PCT)
+            });
 
         // Extract inputs directly from ACC physics data
         // ACC provides these directly rather than through the Moment trait's pedals() method
