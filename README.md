@@ -42,6 +42,10 @@ I want Ocypode to remain a free, open-source tool
 
 ## Usage
 
+Ocypode's telemetry, alert, and setup windows will try to always stay on top of other windows. However, they cannot be over games running in full screen mode. Disable full screen for Ocypode's windows to be always visible. With **Assetto Corsa Competizione**, open the *options* menu, select *video*, and *disable* the first *FULLSCREEN* options. The game will still appear as full screen but it will allow other windows like Ocypode's over it.
+
+## Development
+
 ### Prerequisites
 
 1. Install the [Rust toolchain using `rustup`](https://rustup.rs/)
