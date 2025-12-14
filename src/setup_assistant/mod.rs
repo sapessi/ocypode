@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::telemetry::TelemetryData;
+use crate::track_metadata::TrackMetadata;
 
 pub mod recommendations;
 pub use recommendations::{RecommendationEngine, SetupRecommendation};
@@ -84,6 +85,8 @@ pub struct Finding {
     pub last_detected: u128,
     /// Severity of the issue (0.0 to 1.0)
     pub severity: f32,
+    /// Corner numbers where this issue has been detected (if track metadata available)
+    pub corner_numbers: HashSet<u32>,
 }
 
 /// The phase of a corner where a finding was detected.
@@ -102,6 +105,24 @@ pub enum CornerPhase {
     Straight,
     /// Phase could not be determined
     Unknown,
+}
+
+/// A setup recommendation with corner context information.
+///
+/// This extends the basic SetupRecommendation with information about
+/// which corners the issue was detected in.
+///
+/// # Requirements
+///
+/// Supports Requirement 5.4: Corner number references in recommendation display
+#[derive(Debug, Clone)]
+pub struct CornerAwareRecommendation {
+    /// The base setup recommendation
+    pub recommendation: SetupRecommendation,
+    /// Corner numbers where this issue was detected
+    pub corner_numbers: HashSet<u32>,
+    /// The finding type this recommendation addresses
+    pub finding_type: FindingType,
 }
 
 impl std::fmt::Display for CornerPhase {
@@ -129,13 +150,16 @@ impl std::fmt::Display for CornerPhase {
 /// - Finding aggregation with occurrence counting
 /// - Session management with state clearing
 /// - Corner phase classification
+/// - Corner correlation with track metadata (Requirements 5.3, 5.4)
 pub struct SetupAssistant {
     /// Map of finding types to their current state
     findings: HashMap<FindingType, Finding>,
     /// Set of findings that the user has confirmed
     confirmed_findings: HashSet<FindingType>,
     /// Engine for mapping findings to setup recommendations
-    recommendation_engine: RecommendationEngine,
+    pub recommendation_engine: RecommendationEngine,
+    /// Current track metadata for corner correlation
+    track_metadata: Option<TrackMetadata>,
 }
 
 impl SetupAssistant {
@@ -145,6 +169,7 @@ impl SetupAssistant {
             findings: HashMap::new(),
             confirmed_findings: HashSet::new(),
             recommendation_engine: RecommendationEngine::new(),
+            track_metadata: None,
         }
     }
 
@@ -155,14 +180,18 @@ impl SetupAssistant {
     ///
     /// # Requirements
     ///
-    /// Implements Requirements 1.1, 1.2, 1.4, 1.5:
+    /// Implements Requirements 1.1, 1.2, 1.4, 1.5, 5.3:
     /// - Extracts and categorizes findings from annotations
     /// - Aggregates duplicate findings with occurrence counting
     /// - Classifies corner phase from telemetry state
     /// - Classifies slip by context (throttle/brake state)
+    /// - Correlates findings with corner numbers when track metadata is available
     pub fn process_telemetry(&mut self, telemetry: &TelemetryData) {
         // Classify corner phase from telemetry state
         let corner_phase = Self::classify_corner_phase(telemetry);
+
+        // Determine corner number if track metadata is available
+        let corner_number = self.get_corner_number_for_telemetry(telemetry);
 
         // Process each annotation
         for annotation in &telemetry.annotations {
@@ -178,11 +207,17 @@ impl SetupAssistant {
                         corner_phase,
                         last_detected: telemetry.timestamp_ms,
                         severity: 0.5,
+                        corner_numbers: HashSet::new(),
                     });
 
                 // Aggregate: increment occurrence count
                 finding.occurrence_count += 1;
                 finding.last_detected = telemetry.timestamp_ms;
+
+                // Add corner number if available
+                if let Some(corner_num) = corner_number {
+                    finding.corner_numbers.insert(corner_num);
+                }
             }
         }
     }
@@ -480,7 +515,7 @@ impl SetupAssistant {
     /// Clear all findings and state for a new session.
     ///
     /// This should be called when a new racing session begins to reset
-    /// the analysis state.
+    /// the analysis state. Note: track metadata is preserved across sessions.
     ///
     /// # Requirements
     ///
@@ -488,6 +523,7 @@ impl SetupAssistant {
     pub fn clear_session(&mut self) {
         self.findings.clear();
         self.confirmed_findings.clear();
+        // Note: track_metadata is intentionally preserved across sessions
     }
 
     /// Get the current findings for persistence.
@@ -532,6 +568,80 @@ impl SetupAssistant {
     /// Implements Requirement 5.4: Load saved state on app startup
     pub fn restore_confirmed_findings(&mut self, confirmed_findings: HashSet<FindingType>) {
         self.confirmed_findings = confirmed_findings;
+    }
+
+    /// Set track metadata for corner correlation.
+    ///
+    /// When track metadata is available, the setup assistant can correlate
+    /// telemetry findings with specific corner numbers.
+    ///
+    /// # Requirements
+    ///
+    /// Implements Requirement 5.3: Correlate performance data with corner information
+    pub fn set_track_metadata(&mut self, metadata: Option<TrackMetadata>) {
+        self.track_metadata = metadata;
+    }
+
+    /// Get the current track metadata.
+    pub fn get_track_metadata(&self) -> Option<&TrackMetadata> {
+        self.track_metadata.as_ref()
+    }
+
+    /// Determine which corner a telemetry point belongs to.
+    ///
+    /// Uses track percentage from telemetry data to find the corresponding
+    /// corner annotation in the track metadata.
+    ///
+    /// # Requirements
+    ///
+    /// Implements Requirement 5.3: Telemetry point to corner mapping logic
+    fn get_corner_number_for_telemetry(&self, telemetry: &TelemetryData) -> Option<u32> {
+        let track_metadata = self.track_metadata.as_ref()?;
+
+        // Get track percentage from telemetry (prefer track_position_pct, fallback to lap_distance_pct)
+        let track_percentage = telemetry
+            .track_position_pct
+            .or(telemetry.lap_distance_pct)?;
+
+        // Find the corner that contains this track percentage
+        for corner in &track_metadata.corners {
+            if corner.contains_percentage(track_percentage) {
+                return Some(corner.corner_number);
+            }
+        }
+
+        None
+    }
+
+    /// Get corner-aware recommendations for all confirmed findings.
+    ///
+    /// Returns recommendations with corner context when available.
+    /// This extends the basic get_recommendations method to include corner information.
+    ///
+    /// # Requirements
+    ///
+    /// Implements Requirements 5.4: Reference specific corner numbers in recommendations
+    pub fn get_corner_aware_recommendations(&self) -> Vec<CornerAwareRecommendation> {
+        let mut recommendations = Vec::new();
+
+        // Collect recommendations for all confirmed findings
+        for confirmed_finding in &self.confirmed_findings {
+            if let Some(finding) = self.findings.get(confirmed_finding) {
+                let base_recommendations = self
+                    .recommendation_engine
+                    .get_recommendations(confirmed_finding);
+
+                for rec in base_recommendations {
+                    recommendations.push(CornerAwareRecommendation {
+                        recommendation: rec,
+                        corner_numbers: finding.corner_numbers.clone(),
+                        finding_type: confirmed_finding.clone(),
+                    });
+                }
+            }
+        }
+
+        recommendations
     }
 }
 
@@ -1085,6 +1195,149 @@ mod tests {
             .get(&FindingType::CornerEntryUndersteer)
             .unwrap();
         assert_eq!(restored_finding.occurrence_count, 5);
+    }
+
+    #[test]
+    fn test_corner_correlation_with_track_metadata() {
+        use crate::telemetry::{TelemetryAnnotation, TelemetryData};
+        use crate::track_metadata::{CornerAnnotation, CornerType, TrackMetadata};
+
+        let mut assistant = SetupAssistant::new();
+
+        // Create track metadata with corners
+        let mut track_metadata = TrackMetadata::new(
+            "Test Track".to_string(),
+            "test_track".to_string(),
+            "<svg></svg>".to_string(),
+        );
+
+        // Add corner at 20-30% of track
+        let corner = CornerAnnotation::new(1, 0.2, 0.3, CornerType::LeftHand).unwrap();
+        track_metadata.add_corner(corner);
+
+        assistant.set_track_metadata(Some(track_metadata));
+
+        // Create telemetry data at 25% of track (inside corner 1)
+        let telemetry = TelemetryData {
+            track_position_pct: Some(0.25),
+            annotations: vec![TelemetryAnnotation::Scrub {
+                avg_yaw_rate_change: 0.5,
+                cur_yaw_rate_change: 0.8,
+                is_scrubbing: true,
+            }],
+            ..Default::default()
+        };
+
+        assistant.process_telemetry(&telemetry);
+
+        // Verify finding was created with corner correlation
+        let finding = assistant
+            .get_findings()
+            .get(&FindingType::CornerEntryUndersteer)
+            .unwrap();
+        assert_eq!(finding.occurrence_count, 1);
+        assert!(finding.corner_numbers.contains(&1));
+    }
+
+    #[test]
+    fn test_corner_correlation_without_track_metadata() {
+        use crate::telemetry::{TelemetryAnnotation, TelemetryData};
+
+        let mut assistant = SetupAssistant::new();
+        // No track metadata set
+
+        let telemetry = TelemetryData {
+            track_position_pct: Some(0.25),
+            annotations: vec![TelemetryAnnotation::Scrub {
+                avg_yaw_rate_change: 0.5,
+                cur_yaw_rate_change: 0.8,
+                is_scrubbing: true,
+            }],
+            ..Default::default()
+        };
+
+        assistant.process_telemetry(&telemetry);
+
+        // Verify finding was created but without corner correlation
+        let finding = assistant
+            .get_findings()
+            .get(&FindingType::CornerEntryUndersteer)
+            .unwrap();
+        assert_eq!(finding.occurrence_count, 1);
+        assert!(finding.corner_numbers.is_empty());
+    }
+
+    #[test]
+    fn test_corner_aware_recommendations() {
+        use crate::telemetry::{TelemetryAnnotation, TelemetryData};
+        use crate::track_metadata::{CornerAnnotation, CornerType, TrackMetadata};
+
+        let mut assistant = SetupAssistant::new();
+
+        // Create track metadata with corners
+        let mut track_metadata = TrackMetadata::new(
+            "Test Track".to_string(),
+            "test_track".to_string(),
+            "<svg></svg>".to_string(),
+        );
+
+        let corner = CornerAnnotation::new(1, 0.2, 0.3, CornerType::LeftHand).unwrap();
+        track_metadata.add_corner(corner);
+        assistant.set_track_metadata(Some(track_metadata));
+
+        // Process telemetry with finding in corner 1
+        let telemetry = TelemetryData {
+            track_position_pct: Some(0.25),
+            annotations: vec![TelemetryAnnotation::Scrub {
+                avg_yaw_rate_change: 0.5,
+                cur_yaw_rate_change: 0.8,
+                is_scrubbing: true,
+            }],
+            ..Default::default()
+        };
+
+        assistant.process_telemetry(&telemetry);
+        assistant.toggle_confirmation(FindingType::CornerEntryUndersteer);
+
+        // Get corner-aware recommendations
+        let corner_recommendations = assistant.get_corner_aware_recommendations();
+        assert!(!corner_recommendations.is_empty());
+
+        // Verify corner context is included
+        let first_rec = &corner_recommendations[0];
+        assert!(first_rec.corner_numbers.contains(&1));
+        assert_eq!(first_rec.finding_type, FindingType::CornerEntryUndersteer);
+    }
+
+    #[test]
+    fn test_track_metadata_preserved_across_session_clear() {
+        use crate::track_metadata::{CornerAnnotation, CornerType, TrackMetadata};
+
+        let mut assistant = SetupAssistant::new();
+
+        // Set track metadata
+        let mut track_metadata = TrackMetadata::new(
+            "Test Track".to_string(),
+            "test_track".to_string(),
+            "<svg></svg>".to_string(),
+        );
+
+        let corner = CornerAnnotation::new(1, 0.2, 0.3, CornerType::LeftHand).unwrap();
+        track_metadata.add_corner(corner);
+        assistant.set_track_metadata(Some(track_metadata));
+
+        // Verify metadata is set
+        assert!(assistant.get_track_metadata().is_some());
+
+        // Clear session
+        assistant.clear_session();
+
+        // Verify metadata is preserved
+        assert!(assistant.get_track_metadata().is_some());
+        assert_eq!(
+            assistant.get_track_metadata().unwrap().track_name,
+            "Test Track"
+        );
     }
 
     #[test]

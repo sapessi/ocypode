@@ -9,7 +9,11 @@ use crate::{
 };
 
 pub(crate) mod analysis;
+pub(crate) mod corner_annotation;
 pub(crate) mod live;
+
+// Re-export the corner annotation tool for use in other modules
+pub use corner_annotation::CornerAnnotationTool;
 
 const ALERT_DURATION_MS: u128 = 500;
 pub(crate) type AlertImageSelector<'a> = fn(&TelemetryData) -> Image<'a>;

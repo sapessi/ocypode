@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::FindingType;
 
@@ -110,6 +110,58 @@ impl RecommendationEngine {
         Self {
             recommendation_map: Self::build_recommendation_map(),
         }
+    }
+
+    /// Format a recommendation description with corner context.
+    ///
+    /// When corner numbers are available, this method enhances the recommendation
+    /// description to include specific corner references.
+    ///
+    /// # Requirements
+    ///
+    /// Implements Requirement 5.4: Update recommendation formatting to include corner context
+    pub fn format_recommendation_with_corners(
+        &self,
+        recommendation: &SetupRecommendation,
+        corner_numbers: &HashSet<u32>,
+        _finding_type: &FindingType,
+    ) -> String {
+        if corner_numbers.is_empty() {
+            // No corner context available, return original description
+            return recommendation.description.clone();
+        }
+
+        // Format corner numbers for display
+        let corner_text = if corner_numbers.len() == 1 {
+            format!("corner {}", corner_numbers.iter().next().unwrap())
+        } else {
+            let mut corners: Vec<u32> = corner_numbers.iter().cloned().collect();
+            corners.sort();
+            if corners.len() <= 3 {
+                format!(
+                    "corners {}",
+                    corners
+                        .iter()
+                        .map(|c| c.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            } else {
+                format!(
+                    "corners {}, {}, {} and {} others",
+                    corners[0],
+                    corners[1],
+                    corners[2],
+                    corners.len() - 3
+                )
+            }
+        };
+
+        // Enhance description with corner context
+        format!(
+            "{} (detected in {})",
+            recommendation.description, corner_text
+        )
     }
 
     /// Build the complete recommendation map from the ACC Setup Guide.
@@ -1148,6 +1200,64 @@ mod tests {
             has_forward_bias,
             "Rear brake lock should recommend moving bias forward"
         );
+    }
+
+    #[test]
+    fn test_format_recommendation_with_corners() {
+        let engine = RecommendationEngine::new();
+        let recommendations = engine.get_recommendations(&FindingType::CornerEntryUndersteer);
+        let rec = &recommendations[0];
+
+        // Test with no corners
+        let mut corners = HashSet::new();
+        let formatted = engine.format_recommendation_with_corners(
+            rec,
+            &corners,
+            &FindingType::CornerEntryUndersteer,
+        );
+        assert_eq!(formatted, rec.description);
+
+        // Test with single corner
+        corners.insert(1);
+        let formatted = engine.format_recommendation_with_corners(
+            rec,
+            &corners,
+            &FindingType::CornerEntryUndersteer,
+        );
+        assert!(formatted.contains("corner 1"));
+        assert!(formatted.contains(&rec.description));
+
+        // Test with multiple corners
+        corners.insert(3);
+        corners.insert(5);
+        let formatted = engine.format_recommendation_with_corners(
+            rec,
+            &corners,
+            &FindingType::CornerEntryUndersteer,
+        );
+        assert!(formatted.contains("corners"));
+        assert!(formatted.contains("1"));
+        assert!(formatted.contains("3"));
+        assert!(formatted.contains("5"));
+    }
+
+    #[test]
+    fn test_format_recommendation_with_many_corners() {
+        let engine = RecommendationEngine::new();
+        let recommendations = engine.get_recommendations(&FindingType::CornerEntryUndersteer);
+        let rec = &recommendations[0];
+
+        // Test with many corners (should truncate)
+        let mut corners = HashSet::new();
+        for i in 1..=6 {
+            corners.insert(i);
+        }
+        let formatted = engine.format_recommendation_with_corners(
+            rec,
+            &corners,
+            &FindingType::CornerEntryUndersteer,
+        );
+        assert!(formatted.contains("and 3 others"));
     }
 }
 

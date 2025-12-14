@@ -1187,7 +1187,6 @@ dependencies = [
 [[package]]
 name = "egui-dropdown"
 version = "0.13.0"
-source = "git+https://github.com/sapessi/egui-dropdown.git?branch=egui-0.33#c1a6f877bd3228d88374d1f2be1fa1c1b7f615b3"
 dependencies = [
  "egui",
 ]

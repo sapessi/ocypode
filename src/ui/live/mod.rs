@@ -11,6 +11,7 @@ use log::error;
 
 use crate::setup_assistant::SetupAssistant;
 use crate::telemetry::{TelemetryData, TelemetryOutput};
+use crate::track_metadata::TrackMetadata;
 
 use super::ScrubSlipAlert;
 
@@ -92,6 +93,18 @@ impl LiveTelemetryApp {
             scrub_slip_alert: ScrubSlipAlert::default(),
             setup_assistant,
         }
+    }
+
+    /// Set track metadata for corner correlation in the setup assistant.
+    ///
+    /// This allows the setup assistant to correlate telemetry findings with
+    /// specific corner numbers when track metadata is available.
+    ///
+    /// # Requirements
+    ///
+    /// Implements Requirement 5.3: Correlate performance data with corner information
+    pub fn set_track_metadata(&mut self, metadata: Option<TrackMetadata>) {
+        self.setup_assistant.set_track_metadata(metadata);
     }
 }
 

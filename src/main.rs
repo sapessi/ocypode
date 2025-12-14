@@ -1,6 +1,7 @@
 mod errors;
 mod setup_assistant;
 mod telemetry;
+mod track_metadata;
 mod ui;
 mod writer;
 
@@ -48,6 +49,9 @@ enum Commands {
     Load {
         #[arg(short, long)]
         input: PathBuf,
+
+        #[arg(short, long)]
+        developer: bool,
     },
 }
 
@@ -169,16 +173,29 @@ fn live(window_size: usize, output: Option<PathBuf>, game: GameSource) -> Result
     Ok(())
 }
 
-fn load(input: &PathBuf) -> Result<(), OcypodeError> {
+fn load(input: &PathBuf, developer_mode: bool) -> Result<(), OcypodeError> {
     if !input.exists() {
         return Err(OcypodeError::InvalidTelemetryFile {
             path: format!("{:?}", input),
         });
     }
+
+    let window_title = if developer_mode {
+        "Ocypode Telemetry - Developer Mode"
+    } else {
+        "Ocypode Telemetry"
+    };
+
     eframe::run_native(
-        "Ocypode Telemetry",
+        window_title,
         eframe::NativeOptions::default(),
-        Box::new(|cc| Ok(Box::new(TelemetryAnalysisApp::from_file(input, cc)))),
+        Box::new(|cc| {
+            Ok(Box::new(TelemetryAnalysisApp::from_file(
+                input,
+                developer_mode,
+                cc,
+            )))
+        }),
     )
     .expect("could not start app");
     Ok(())
@@ -195,8 +212,8 @@ fn main() {
     })
     .expect("Could not set Ctrl-C handler");
     match &cli.command {
-        Commands::Load { input } => {
-            load(input).expect("Error while analyzing telemetry file");
+        Commands::Load { input, developer } => {
+            load(input, *developer).expect("Error while analyzing telemetry file");
         }
         Commands::Live {
             window,

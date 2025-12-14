@@ -228,7 +228,14 @@ impl LiveTelemetryApp {
     /// - Prioritizes recommendations by impact
     /// - Highlights conflicting recommendations
     fn show_recommendations(&self, ui: &mut egui::Ui) {
-        // Get processed recommendations with priority and conflict detection
+        // Get corner-aware recommendations if track metadata is available
+        let corner_recommendations = self.setup_assistant.get_corner_aware_recommendations();
+        let has_corner_context = !corner_recommendations.is_empty()
+            && corner_recommendations
+                .iter()
+                .any(|r| !r.corner_numbers.is_empty());
+
+        // Fallback to processed recommendations for display
         let processed_recommendations = self.setup_assistant.get_processed_recommendations();
 
         // If no confirmed findings, show a message
@@ -248,7 +255,7 @@ impl LiveTelemetryApp {
         ui.heading("Setup Recommendations");
         ui.add_space(8.0);
 
-        // Show priority info
+        // Show priority info and corner context indicator
         ui.horizontal(|ui| {
             ui.label(
                 egui::RichText::new("Sorted by priority • ")
@@ -260,12 +267,25 @@ impl LiveTelemetryApp {
                     .size(12.0)
                     .color(egui::Color32::from_rgb(255, 200, 100)),
             );
+            if has_corner_context {
+                ui.label(
+                    egui::RichText::new(" • 🏁 = Corner-specific")
+                        .size(12.0)
+                        .color(egui::Color32::from_rgb(100, 200, 255)),
+                );
+            }
         });
         ui.add_space(12.0);
 
         // Display recommendations in priority order (already sorted by process_recommendations)
         for proc_rec in &processed_recommendations {
             let rec = &proc_rec.recommendation;
+
+            // Find corresponding corner-aware recommendation for corner context
+            let corner_context = corner_recommendations.iter().find(|cr| {
+                cr.recommendation.parameter == rec.parameter
+                    && cr.recommendation.adjustment == rec.adjustment
+            });
 
             // Priority badge, category, parameter, and adjustment on one line
             ui.horizontal(|ui| {
@@ -294,6 +314,15 @@ impl LiveTelemetryApp {
                     ui.label("•");
                 }
 
+                // Corner indicator if corner context is available
+                if let Some(corner_rec) = corner_context
+                    && !corner_rec.corner_numbers.is_empty()
+                {
+                    ui.label(
+                        egui::RichText::new("🏁").color(egui::Color32::from_rgb(100, 200, 255)),
+                    );
+                }
+
                 // Category badge (small, subtle)
                 ui.label(
                     egui::RichText::new(format!("[{}]", rec.category))
@@ -310,11 +339,29 @@ impl LiveTelemetryApp {
                 ui.label(egui::RichText::new(&rec.adjustment).color(egui::Color32::WHITE));
             });
 
-            // Description indented below with improved readability
+            // Description with corner context if available
             ui.horizontal(|ui| {
                 ui.add_space(15.0);
+
+                let description_text = if let Some(corner_rec) = corner_context {
+                    if !corner_rec.corner_numbers.is_empty() {
+                        // Use corner-aware formatting
+                        self.setup_assistant
+                            .recommendation_engine
+                            .format_recommendation_with_corners(
+                                rec,
+                                &corner_rec.corner_numbers,
+                                &corner_rec.finding_type,
+                            )
+                    } else {
+                        rec.description.clone()
+                    }
+                } else {
+                    rec.description.clone()
+                };
+
                 ui.label(
-                    egui::RichText::new(&rec.description)
+                    egui::RichText::new(&description_text)
                         .italics()
                         .size(12.0)
                         .color(egui::Color32::GRAY),

@@ -39,6 +39,30 @@ pub enum OcypodeError {
     #[snafu(display("Error serializing config file"))]
     ConfigSerializeError { source: serde_json::Error },
 
+    // Track metadata errors
+    #[snafu(display("Track metadata validation failed: {reason}"))]
+    TrackMetadataValidationError { reason: String },
+    #[snafu(display("Track metadata storage error: {reason}"))]
+    TrackMetadataStorageError { reason: String },
+    #[snafu(display("Track name extraction failed: {reason}"))]
+    TrackNameExtractionError { reason: String },
+    #[snafu(display("SVG generation failed: {reason}"))]
+    SvgGenerationError { reason: String },
+    #[snafu(display("Corner annotation error: {reason}"))]
+    CornerAnnotationError { reason: String },
+
+    // User input validation errors
+    #[snafu(display("Invalid user input: {field} - {reason}"))]
+    InvalidUserInput { field: String, reason: String },
+    #[snafu(display("File operation failed: {operation} - {reason}"))]
+    FileOperationError { operation: String, reason: String },
+
+    // Fallback and recovery errors
+    #[snafu(display("Manual track identification required: {reason}"))]
+    ManualTrackIdentificationRequired { reason: String },
+    #[snafu(display("Recovery suggestion: {suggestion}"))]
+    RecoverySuggestion { suggestion: String },
+
     // UI errors
     #[snafu(display("Invalid telemetry file: {path}"))]
     InvalidTelemetryFile { path: String },

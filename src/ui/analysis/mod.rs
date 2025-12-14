@@ -7,37 +7,22 @@ use egui::{
 use egui_dropdown::DropDownBox;
 use egui_plot::{Legend, Line, PlotPoints, Points};
 use itertools::Itertools;
+use log;
 
 use crate::{
-    OcypodeError,
-    telemetry::{SessionInfo, TelemetryAnnotation, TelemetryData, TelemetryOutput},
+    telemetry::TelemetryAnnotation,
+    track_metadata::{TrackMetadata, TrackMetadataStorage},
     ui::live::{PALETTE_BLACK, PALETTE_BROWN, PALETTE_MAROON, PALETTE_ORANGE},
 };
 
 use super::{Alert, DefaultAlert, ScrubSlipAlert, stroke_shade};
 
-#[derive(Default, Clone, Debug)]
-struct TelemetryFile {
-    sessions: Vec<Session>,
-}
+mod data_types;
+mod developer_ui;
+mod telemetry_loader;
 
-#[derive(Default, Clone, Debug)]
-struct Lap {
-    telemetry: Vec<TelemetryData>,
-}
-
-#[derive(Default, Clone, Debug)]
-struct Session {
-    info: SessionInfo,
-    laps: Vec<Lap>,
-}
-
-#[derive(Clone)]
-enum UiState {
-    Loading,
-    Error { message: String },
-    Display { session: Session },
-}
+use data_types::{Lap, Session, TelemetryFile, UiState};
+use developer_ui::DeveloperUiState;
 
 pub(crate) struct TelemetryAnalysisApp<'file> {
     source_file: &'file PathBuf,
@@ -48,10 +33,20 @@ pub(crate) struct TelemetryAnalysisApp<'file> {
     comparison_lap: String,
     selected_annotation_content: String,
     selected_x: Option<usize>,
+    is_developer_mode: bool,
+    // Developer mode UI state
+    developer_ui: DeveloperUiState,
+    // Load interface track metadata integration
+    loaded_track_metadata: Option<TrackMetadata>,
+    track_metadata_lookup_attempted: bool,
 }
 
 impl<'file> TelemetryAnalysisApp<'file> {
-    pub(crate) fn from_file(input: &'file PathBuf, cc: &eframe::CreationContext<'_>) -> Self {
+    pub(crate) fn from_file(
+        input: &'file PathBuf,
+        developer_mode: bool,
+        cc: &eframe::CreationContext<'_>,
+    ) -> Self {
         let default_visuals = Visuals {
             dark_mode: true,
             hyperlink_color: PALETTE_MAROON,
@@ -65,6 +60,7 @@ impl<'file> TelemetryAnalysisApp<'file> {
             ..Default::default()
         };
         cc.egui_ctx.set_visuals(default_visuals);
+
         Self {
             source_file: input,
             ui_state: UiState::Loading,
@@ -74,6 +70,12 @@ impl<'file> TelemetryAnalysisApp<'file> {
             comparison_lap: "".to_string(),
             selected_annotation_content: "".to_string(),
             selected_x: None,
+            is_developer_mode: developer_mode,
+            // Initialize developer mode UI state
+            developer_ui: DeveloperUiState::default(),
+            // Initialize load interface track metadata integration
+            loaded_track_metadata: None,
+            track_metadata_lookup_attempted: false,
         }
     }
 
@@ -86,6 +88,9 @@ impl<'file> TelemetryAnalysisApp<'file> {
                 .sessions
                 .iter()
                 .map(|i| i.info.track_name.as_str());
+
+            let previous_session = self.selected_session.clone();
+
             ui.label(RichText::new("Session: ").color(Color32::WHITE));
             ui.add(
                 DropDownBox::from_iter(
@@ -96,6 +101,12 @@ impl<'file> TelemetryAnalysisApp<'file> {
                 )
                 .filter_by_input(false),
             );
+
+            // Reset track metadata lookup if session changed
+            if previous_session != self.selected_session {
+                self.track_metadata_lookup_attempted = false;
+                self.loaded_track_metadata = None;
+            }
 
             if let Some(selected_session) = self
                 .data
@@ -281,6 +292,225 @@ impl<'file> TelemetryAnalysisApp<'file> {
             }
         });
     }
+
+    /// Clear status messages after they've been displayed for a while
+    fn clear_old_status_messages(&mut self) {
+        // This is a simple implementation - in a real app you might want to use timestamps
+        // For now, we'll just clear messages when dialogs are closed
+        if !self.developer_ui.show_save_confirmation && !self.developer_ui.show_load_dialog {
+            // Clear messages after successful operations or when no dialogs are open
+            if let Some(ref msg) = self.developer_ui.save_status_message
+                && msg.starts_with('✓')
+            {
+                // Keep success messages a bit longer, but clear them eventually
+                // This is a simplified approach - you could use a timer here
+            }
+        }
+    }
+
+    /// Attempt to load track metadata for the current session with comprehensive error handling
+    /// This implements Requirements 5.1 and 5.5 - check for available track metadata and graceful degradation
+    fn attempt_track_metadata_lookup(&mut self, track_name: &str) {
+        use log::{debug, error, info, warn};
+
+        if self.track_metadata_lookup_attempted {
+            return;
+        }
+
+        self.track_metadata_lookup_attempted = true;
+        debug!("Attempting track metadata lookup for: {}", track_name);
+
+        // Validate track name before lookup
+        if track_name.is_empty() {
+            warn!("Cannot lookup metadata for empty track name");
+            self.loaded_track_metadata = None;
+            self.developer_ui.load_status_message = Some("⚠ Track name is empty".to_string());
+            return;
+        }
+
+        if track_name == "Unknown" {
+            debug!("Skipping metadata lookup for unknown track");
+            self.loaded_track_metadata = None;
+            self.developer_ui.load_status_message =
+                Some("ℹ Track identification needed for metadata".to_string());
+            return;
+        }
+
+        if let Some(ref storage) = self.developer_ui.metadata_storage {
+            match storage.load_metadata(track_name) {
+                Ok(Some(metadata)) => {
+                    info!("Successfully loaded track metadata for: {}", track_name);
+                    self.loaded_track_metadata = Some(metadata);
+                    self.developer_ui.load_status_message =
+                        Some(format!("✓ Loaded track map for {}", track_name));
+                }
+                Ok(None) => {
+                    debug!("No track metadata found for: {}", track_name);
+                    self.loaded_track_metadata = None;
+                    self.developer_ui.load_status_message =
+                        Some(format!("ℹ No track map available for {}", track_name));
+                }
+                Err(e) => {
+                    error!("Failed to load track metadata for {}: {}", track_name, e);
+                    self.loaded_track_metadata = None;
+
+                    // Provide user-friendly error messages with recovery suggestions
+                    let user_message = self.create_metadata_error_message(&e, track_name);
+                    self.developer_ui.load_status_message = Some(user_message);
+                }
+            }
+        } else {
+            warn!("Metadata storage not available for track metadata lookup");
+            self.loaded_track_metadata = None;
+            self.developer_ui.load_status_message =
+                Some("⚠ Track metadata system not available".to_string());
+        }
+    }
+
+    /// Create user-friendly error message for metadata loading failures
+    fn create_metadata_error_message(
+        &self,
+        error: &crate::OcypodeError,
+        track_name: &str,
+    ) -> String {
+        use crate::OcypodeError;
+
+        match error {
+            OcypodeError::TrackMetadataValidationError { reason } => {
+                format!(
+                    "⚠ Track map data is corrupted for {}: {}",
+                    track_name, reason
+                )
+            }
+            OcypodeError::TrackMetadataStorageError { reason } => {
+                if reason.contains("Failed to read file") {
+                    format!("⚠ Cannot read track map file for {}", track_name)
+                } else if reason.contains("Failed to parse JSON") {
+                    format!("⚠ Track map file is corrupted for {}", track_name)
+                } else {
+                    format!("⚠ Track map storage error for {}: {}", track_name, reason)
+                }
+            }
+            OcypodeError::FileOperationError { operation, reason } => match operation.as_str() {
+                "read_metadata_file" => {
+                    format!("⚠ Cannot access track map file for {}", track_name)
+                }
+                "load_backup" => format!(
+                    "⚠ Track map backup files are also corrupted for {}",
+                    track_name
+                ),
+                _ => format!(
+                    "⚠ File system error loading track map for {}: {}",
+                    track_name, reason
+                ),
+            },
+            OcypodeError::InvalidUserInput { field, reason } => {
+                format!("⚠ Invalid track name '{}': {}", field, reason)
+            }
+            _ => {
+                format!("⚠ Failed to load track map for {}", track_name)
+            }
+        }
+    }
+
+    /// Show track map panel alongside telemetry charts
+    /// This implements Requirement 5.2 - display SVG track map alongside telemetry information
+    fn show_track_map_panel(&mut self, ui: &mut Ui, session: &Session) {
+        ui.group(|ui| {
+            ui.set_max_width(300.0);
+            ui.set_max_height(250.0);
+
+            ui.label(RichText::new("Track Map").color(Color32::WHITE).strong());
+            ui.separator();
+
+            if let Some(ref metadata) = self.loaded_track_metadata {
+                // Display SVG track map
+                ui.label(RichText::new(&metadata.track_name).color(Color32::WHITE));
+                ui.add_space(5.0);
+
+                // Show SVG preview (simplified text representation for now)
+                egui::ScrollArea::both().max_height(150.0).show(ui, |ui| {
+                    let svg_preview = if metadata.svg_map.len() > 150 {
+                        format!(
+                            "{}...\n\n[SVG Map Available - {} characters]",
+                            &metadata.svg_map[..150],
+                            metadata.svg_map.len()
+                        )
+                    } else {
+                        metadata.svg_map.clone()
+                    };
+
+                    ui.label(
+                        RichText::new(svg_preview)
+                            .color(Color32::LIGHT_GRAY)
+                            .small()
+                            .monospace(),
+                    );
+                });
+
+                ui.add_space(5.0);
+
+                // Show corner information if available
+                if !metadata.corners.is_empty() {
+                    ui.label(
+                        RichText::new(format!("Corners: {}", metadata.corners.len()))
+                            .color(Color32::LIGHT_BLUE),
+                    );
+
+                    // Show corner details in a compact format
+                    egui::ScrollArea::vertical()
+                        .max_height(60.0)
+                        .show(ui, |ui| {
+                            for corner in &metadata.corners {
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                        RichText::new(format!("C{}", corner.corner_number))
+                                            .color(Color32::YELLOW)
+                                            .small(),
+                                    );
+                                    ui.label(
+                                        RichText::new(format!(
+                                            "{:.1}%-{:.1}%",
+                                            corner.track_percentage_start * 100.0,
+                                            corner.track_percentage_end * 100.0
+                                        ))
+                                        .color(Color32::GRAY)
+                                        .small(),
+                                    );
+                                });
+                            }
+                        });
+                } else {
+                    ui.label(
+                        RichText::new("No corner annotations")
+                            .color(Color32::GRAY)
+                            .small(),
+                    );
+                }
+            } else {
+                // Graceful degradation when no metadata is available (Requirement 5.5)
+                ui.vertical_centered(|ui| {
+                    ui.add_space(20.0);
+                    ui.label(RichText::new("No track map available").color(Color32::GRAY));
+                    ui.add_space(5.0);
+                    ui.label(
+                        RichText::new(format!("Track: {}", session.info.track_name))
+                            .color(Color32::WHITE)
+                            .small(),
+                    );
+
+                    if self.is_developer_mode {
+                        ui.add_space(10.0);
+                        ui.label(
+                            RichText::new("💡 Use developer mode to create track metadata")
+                                .color(Color32::YELLOW)
+                                .small(),
+                        );
+                    }
+                });
+            }
+        });
+    }
 }
 
 impl eframe::App for TelemetryAnalysisApp<'_> {
@@ -290,7 +520,8 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
         match cur_ui_state {
             UiState::Loading => {
                 if self.data.is_none() {
-                    let telemetry_load_result = load_telemetry_jsonl(self.source_file);
+                    let telemetry_load_result =
+                        telemetry_loader::load_telemetry_jsonl(self.source_file);
                     if telemetry_load_result.is_err() {
                         self.ui_state = UiState::Error {
                             message: format!(
@@ -314,15 +545,106 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                 }
             }
             UiState::Display { session } => {
+                // Attempt to load track metadata for the current session (Requirements 5.1, 5.5)
+                self.attempt_track_metadata_lookup(&session.info.track_name);
+
+                // Show developer mode indicator in the top panel if enabled
                 egui::TopBottomPanel::top("SessionSelector")
                     .frame(
                         Frame::default()
                             .fill(Color32::TRANSPARENT)
                             .inner_margin(Margin::same(5)),
                     )
+                    .resizable(false)
+                    .min_height(40.0)
+                    .max_height(80.0)
                     .show(ctx, |local_ui| {
+                        if self.is_developer_mode {
+                            local_ui.with_layout(
+                                Layout::left_to_right(egui::Align::Center),
+                                |ui| {
+                                    ui.label(
+                                        RichText::new("🔧 Developer Mode - Track Metadata Manager")
+                                            .color(Color32::YELLOW)
+                                            .strong(),
+                                    );
+                                    ui.separator();
+                                    ui.label(
+                                        RichText::new(format!(
+                                            "Track: {}",
+                                            session.info.track_name
+                                        ))
+                                        .color(Color32::WHITE),
+                                    );
+                                },
+                            );
+                            local_ui.separator();
+                        } else {
+                            // Show track metadata status in regular mode
+                            local_ui.with_layout(
+                                Layout::left_to_right(egui::Align::Center),
+                                |ui| {
+                                    ui.label(
+                                        RichText::new(format!(
+                                            "Track: {}",
+                                            session.info.track_name
+                                        ))
+                                        .color(Color32::WHITE),
+                                    );
+
+                                    if self.loaded_track_metadata.is_some() {
+                                        ui.separator();
+                                        ui.label(
+                                            RichText::new("🗺️ Track map available")
+                                                .color(Color32::GREEN)
+                                                .small(),
+                                        );
+                                    }
+                                },
+                            );
+                        }
                         self.show_selectors(local_ui);
                     });
+
+                // Show developer mode panel on the left if enabled
+                if self.is_developer_mode {
+                    egui::SidePanel::left("DeveloperModeControls")
+                        .frame(
+                            Frame::default()
+                                .fill(Color32::TRANSPARENT)
+                                .inner_margin(Margin::same(5)),
+                        )
+                        .resizable(true)
+                        .min_width(250.0)
+                        .max_width(400.0)
+                        .show(ctx, |ui| {
+                            // Constrain the developer panel to not take up the full screen height
+                            egui::ScrollArea::vertical()
+                                .max_height(ctx.available_rect().height() * 0.7) // Limit to 70% of screen height
+                                .show(ui, |ui| {
+                                    self.developer_ui.show_developer_mode_panel(
+                                        ui,
+                                        &session,
+                                        &self.selected_lap,
+                                    );
+                                });
+                        });
+                } else if self.loaded_track_metadata.is_some() {
+                    // Show track map panel in regular mode when metadata is available (Requirement 5.2)
+                    egui::SidePanel::left("TrackMapPanel")
+                        .frame(
+                            Frame::default()
+                                .fill(Color32::TRANSPARENT)
+                                .inner_margin(Margin::same(5)),
+                        )
+                        .resizable(true)
+                        .min_width(200.0)
+                        .max_width(350.0)
+                        .show(ctx, |ui| {
+                            self.show_track_map_panel(ui, &session);
+                        });
+                }
+
                 egui::SidePanel::right("AnnotationDetail")
                     .frame(
                         Frame::default()
@@ -334,7 +656,8 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                     .max_width(ctx.available_rect().height() / 7.)
                     .show(ctx, |local_ui| {
                         if let Ok(selected_lap) = self.selected_lap.parse::<usize>() {
-                            if let Some(x_point) = self.selected_x && let Some(lap) = session.laps.get(selected_lap) && let Some(telemetry) = lap.telemetry.get(x_point) {
+                            if let (Some(x_point), Some(lap)) = (self.selected_x, session.laps.get(selected_lap)) &&
+                                 let Some(telemetry) = lap.telemetry.get(x_point) {
                                         let mut abs_alert = DefaultAlert::abs().button();
                                         let mut shift_alert = DefaultAlert::shift().button();
                                         let mut traction_alert = DefaultAlert::traction().button();
@@ -417,7 +740,7 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                                         local_ui.add(
                                             Label::new(RichText::new(self.selected_annotation_content.clone()).color(Color32::WHITE))
                                         );
-                                    }
+                                }
                             } else {
                                 local_ui.with_layout(
                                     Layout::centered_and_justified(Direction::TopDown),
@@ -442,168 +765,39 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
                             self.show_telemetry_chart(selected_lap, &session, local_ui);
                         }
                     });
+
+                // Show corner annotation dialog if needed (developer mode only)
+                if self.is_developer_mode {
+                    // Create a temporary UI for the dialog
+                    egui::Area::new(egui::Id::new("corner_dialog")).show(ctx, |ui| {
+                        self.developer_ui
+                            .corner_annotation_tool
+                            .show_corner_input_dialog(ui);
+                    });
+
+                    // Show save confirmation dialog
+                    if self.developer_ui.show_save_confirmation {
+                        // TODO: Move dialog to developer_ui module
+                    }
+
+                    // Show load dialog
+                    if self.developer_ui.show_load_dialog {
+                        // TODO: Move dialog to developer_ui module
+                    }
+                }
             }
+
             UiState::Error { message } => {
                 egui::CentralPanel::default().show(ctx, |ui| {
                     ui.heading(RichText::new(message).color(Color32::RED).strong());
                 });
             }
         }
+        // Clear status messages after some time (in developer mode)
+        if self.is_developer_mode {
+            self.clear_old_status_messages();
+        }
+
         ctx.request_repaint();
-    }
-}
-
-/// Detects if a telemetry file uses the legacy TelemetryPoint format
-/// by attempting to parse the first line as a raw JSON value and checking
-/// for the presence of legacy-specific fields.
-fn is_legacy_format(source_file: &PathBuf) -> bool {
-    use std::fs::File;
-    use std::io::{BufRead, BufReader};
-
-    // Try to read the first line of the file
-    let file = match File::open(source_file) {
-        Ok(f) => f,
-        Err(_) => return false,
-    };
-
-    let mut reader = BufReader::new(file);
-    let mut first_line = String::new();
-
-    if reader.read_line(&mut first_line).is_err() {
-        return false;
-    }
-
-    // Try to parse as JSON
-    let json_value: serde_json::Value = match serde_json::from_str(&first_line) {
-        Ok(v) => v,
-        Err(_) => return false,
-    };
-
-    // Check if it's a DataPoint variant
-    if let Some(obj) = json_value.get("DataPoint") {
-        // Legacy format has fields like "cur_gear", "cur_rpm", "cur_speed", "lap_dist"
-        // New format has "gear", "engine_rpm", "speed_mps", "lap_distance"
-        let has_legacy_fields = obj.get("cur_gear").is_some()
-            || obj.get("cur_rpm").is_some()
-            || obj.get("cur_speed").is_some()
-            || obj.get("lap_dist").is_some()
-            || obj.get("car_shift_ideal_rpm").is_some();
-
-        let has_new_fields = obj.get("game_source").is_some();
-
-        // If it has legacy fields and doesn't have new fields, it's legacy format
-        return has_legacy_fields && !has_new_fields;
-    }
-
-    false
-}
-
-fn load_telemetry_jsonl(source_file: &PathBuf) -> Result<TelemetryFile, OcypodeError> {
-    // Check if this is a legacy format file before attempting to deserialize
-    if is_legacy_format(source_file) {
-        return Err(OcypodeError::LegacyTelemetryFormat);
-    }
-
-    // TODO: Should probably load in a non-blocking way here
-    let telemetry_lines = serde_jsonlines::json_lines(source_file)
-        .map_err(|e| OcypodeError::TelemetryLoaderError { source: e })?
-        .collect::<Result<Vec<TelemetryOutput>, std::io::Error>>()
-        .map_err(|e| {
-            // If deserialization fails, check if it might be a legacy format
-            // that we didn't catch in the initial check
-            if is_legacy_format(source_file) {
-                OcypodeError::LegacyTelemetryFormat
-            } else {
-                OcypodeError::TelemetryLoaderError { source: e }
-            }
-        })?;
-
-    let mut telemetry_data = TelemetryFile::default();
-    let mut cur_lap_no: u32 = 0;
-    let mut cur_session = Session::default();
-    let mut cur_lap = Lap::default();
-    for line in telemetry_lines {
-        match line {
-            TelemetryOutput::DataPoint(telemetry_point) => {
-                let lap_no = telemetry_point.lap_number.unwrap_or(0);
-                if lap_no != cur_lap_no {
-                    cur_session.laps.push(cur_lap.clone());
-                    cur_lap = Lap::default();
-                    cur_lap_no = lap_no;
-                }
-                cur_lap.telemetry.push(*telemetry_point);
-            }
-            TelemetryOutput::SessionChange(session_info) => {
-                if !cur_lap.telemetry.is_empty() {
-                    cur_session.laps.push(cur_lap);
-                }
-                // if we already have data points we are starting a new session
-                if !cur_session.laps.is_empty() {
-                    telemetry_data.sessions.push(cur_session.clone());
-                    cur_session = Session::default();
-                }
-                cur_lap = Lap::default();
-                cur_lap_no = 0;
-                cur_session.info = session_info;
-            }
-        }
-    }
-    telemetry_data.sessions.push(cur_session);
-    Ok(telemetry_data)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::Write;
-    use tempfile::NamedTempFile;
-
-    #[test]
-    fn test_legacy_format_detection() {
-        // Create a temporary file with legacy format
-        let mut legacy_file = NamedTempFile::new().unwrap();
-        writeln!(
-            legacy_file,
-            r#"{{"DataPoint":{{"point_no":0,"point_epoch":1234567890,"lap_dist":100.0,"lap_dist_pct":0.5,"last_lap_time_s":90.0,"best_lap_time_s":88.0,"car_shift_ideal_rpm":7000.0,"cur_gear":3,"cur_rpm":5000.0,"cur_speed":50.0,"lap_no":1,"throttle":0.8,"brake":0.0,"steering":0.1,"steering_pct":0.05,"abs_active":false,"lat":0.0,"lon":0.0,"lat_accel":0.0,"lon_accel":0.0,"pitch":0.0,"pitch_rate":0.0,"roll":0.0,"roll_rate":0.0,"yaw":0.0,"yaw_rate":0.0,"lf_tire_info":null,"rf_tire_info":null,"lr_tire_info":null,"rr_tire_info":null,"annotations":[]}}}}"#
-        ).unwrap();
-        legacy_file.flush().unwrap();
-
-        // Test that legacy format is detected
-        assert!(is_legacy_format(&legacy_file.path().to_path_buf()));
-    }
-
-    #[test]
-    fn test_new_format_not_detected_as_legacy() {
-        // Create a temporary file with new format
-        let mut new_file = NamedTempFile::new().unwrap();
-        writeln!(
-            new_file,
-            r#"{{"DataPoint":{{"point_no":0,"timestamp_ms":1234567890,"game_source":"IRacing","gear":3,"speed_mps":50.0,"engine_rpm":5000.0,"max_engine_rpm":8000.0,"shift_point_rpm":7000.0,"throttle":0.8,"brake":0.0,"clutch":0.0,"steering":0.1,"steering_pct":0.05,"lap_distance":100.0,"lap_distance_pct":0.5,"lap_number":1,"last_lap_time_s":90.0,"best_lap_time_s":88.0,"is_pit_limiter_engaged":false,"is_in_pit_lane":false,"abs_active":false,"lat":0.0,"lon":0.0,"lat_accel":0.0,"lon_accel":0.0,"pitch":0.0,"pitch_rate":0.0,"roll":0.0,"roll_rate":0.0,"yaw":0.0,"yaw_rate":0.0,"lf_tire_info":null,"rf_tire_info":null,"lr_tire_info":null,"rr_tire_info":null,"annotations":[]}}}}"#
-        ).unwrap();
-        new_file.flush().unwrap();
-
-        // Test that new format is NOT detected as legacy
-        assert!(!is_legacy_format(&new_file.path().to_path_buf()));
-    }
-
-    #[test]
-    fn test_load_legacy_format_returns_error() {
-        // Create a temporary file with legacy format
-        let mut legacy_file = NamedTempFile::new().unwrap();
-        writeln!(
-            legacy_file,
-            r#"{{"DataPoint":{{"point_no":0,"point_epoch":1234567890,"lap_dist":100.0,"lap_dist_pct":0.5,"last_lap_time_s":90.0,"best_lap_time_s":88.0,"car_shift_ideal_rpm":7000.0,"cur_gear":3,"cur_rpm":5000.0,"cur_speed":50.0,"lap_no":1,"throttle":0.8,"brake":0.0,"steering":0.1,"steering_pct":0.05,"abs_active":false,"lat":0.0,"lon":0.0,"lat_accel":0.0,"lon_accel":0.0,"pitch":0.0,"pitch_rate":0.0,"roll":0.0,"roll_rate":0.0,"yaw":0.0,"yaw_rate":0.0,"lf_tire_info":null,"rf_tire_info":null,"lr_tire_info":null,"rr_tire_info":null,"annotations":[]}}}}"#
-        ).unwrap();
-        legacy_file.flush().unwrap();
-
-        // Test that loading legacy format returns the correct error
-        let result = load_telemetry_jsonl(&legacy_file.path().to_path_buf());
-        assert!(result.is_err());
-        match result {
-            Err(OcypodeError::LegacyTelemetryFormat) => {
-                // Expected error
-            }
-            _ => panic!("Expected LegacyTelemetryFormat error"),
-        }
     }
 }
