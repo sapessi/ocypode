@@ -27,12 +27,13 @@ clap = { version = "4.5.53", features = [ "derive" ] }
 ctrlc = "3.4.5"
 
 # gui framework
-eframe = "0.33.2"
-egui = "0.33.2"
-egui_extras = { version = "0.33.2", features = ["all_loaders"] }
+eframe = "0.33.3"
+egui = "0.33.3"
+egui_extras = { version = "0.33.3", features = ["all_loaders"] }
 egui_plot = "0.34.0"
-#egui-dropdown = { git="https://github.com/sapessi/egui-dropdown.git", branch="egui-0.33" }
-egui-dropdown = { path = "../egui-dropdown/" }
+egui-dropdown = { git="https://github.com/sapessi/egui-dropdown.git", branch="egui-0.33" }
+rfd = "0.16.0"
+#egui-dropdown = { path = "../egui-dropdown/" }
 
 # serialization
 serde = "1.0.217"

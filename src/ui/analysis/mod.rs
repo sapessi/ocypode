@@ -1,8 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use egui::{
-    Align, Color32, Direction, Frame, Label, Layout, Margin, RichText, Ui, Vec2b, Visuals,
-    style::Widgets,
+    Align, Color32, Direction, Frame, Label, Layout, Margin, RichText, Ui, Vec2b, Visuals, containers::CentralPanel, style::Widgets
 };
 use egui_dropdown::DropDownBox;
 use egui_plot::{Legend, Line, PlotPoints, Points};
@@ -25,7 +24,7 @@ use data_types::{Lap, Session, TelemetryFile, UiState};
 use developer_ui::DeveloperUiState;
 
 pub(crate) struct TelemetryAnalysisApp<'file> {
-    source_file: &'file PathBuf,
+    source_file: Option<&'file PathBuf>,
     ui_state: UiState,
     data: Option<TelemetryFile>,
     selected_session: String,
@@ -39,30 +38,26 @@ pub(crate) struct TelemetryAnalysisApp<'file> {
     // Load interface track metadata integration
     loaded_track_metadata: Option<TrackMetadata>,
     track_metadata_lookup_attempted: bool,
+
+    files_loaded: Vec<TelemetryFileState>,
+}
+
+pub(crate) struct TelemetryFileState {
+    source_file: PathBuf,
+    data: TelemetryFile,
+    selected_session: String,
+    selected_lap: String,
+    comparison_lap: String,
 }
 
 impl<'file> TelemetryAnalysisApp<'file> {
-    pub(crate) fn from_file(
-        input: &'file PathBuf,
-        developer_mode: bool,
-        cc: &eframe::CreationContext<'_>,
-    ) -> Self {
-        let default_visuals = Visuals {
-            dark_mode: true,
-            hyperlink_color: PALETTE_MAROON,
-            faint_bg_color: PALETTE_BLACK,
-            extreme_bg_color: PALETTE_BROWN,
-            panel_fill: PALETTE_BLACK,
-            button_frame: true,
-            window_fill: PALETTE_BLACK,
-            widgets: Widgets::dark(),
-            striped: false,
-            ..Default::default()
-        };
-        cc.egui_ctx.set_visuals(default_visuals);
+    pub(crate) fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // This gives us image support:
+        egui_extras::install_image_loaders(&cc.egui_ctx);
+
 
         Self {
-            source_file: input,
+            source_file: None,
             ui_state: UiState::Loading,
             data: None,
             selected_session: "".to_string(),
@@ -70,12 +65,12 @@ impl<'file> TelemetryAnalysisApp<'file> {
             comparison_lap: "".to_string(),
             selected_annotation_content: "".to_string(),
             selected_x: None,
-            is_developer_mode: developer_mode,
-            // Initialize developer mode UI state
+            is_developer_mode: false,
             developer_ui: DeveloperUiState::default(),
-            // Initialize load interface track metadata integration
             loaded_track_metadata: None,
             track_metadata_lookup_attempted: false,
+
+            files_loaded: Vec::new(),
         }
     }
 
@@ -514,6 +509,51 @@ impl<'file> TelemetryAnalysisApp<'file> {
 }
 
 impl eframe::App for TelemetryAnalysisApp<'_> {
+    fn clear_color(&self, visuals: &egui::Visuals) -> [f32; 4] {
+        // Give the area behind the floating windows a different color, because it looks better:
+        let color = egui::lerp(
+            egui::Rgba::from(visuals.panel_fill)..=egui::Rgba::from(visuals.extreme_bg_color),
+            0.5,
+        );
+        let color = egui::Color32::from(color);
+        color.to_normalized_gamma_f32()
+    }
+
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        egui::TopBottomPanel::top("wrap_app_top_bar")
+            .frame(egui::Frame::new().inner_margin(4))
+            .show(ctx, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.visuals_mut().button_frame = false;
+                    if ui.button("📂 Load Telemetry").clicked() && let Some(path) = rfd::FileDialog::new().pick_file()
+                    {
+                        let new_telemetry_file = TelemetryFileState {
+                            source_file: path.clone(),
+                            data: telemetry_loader::load_telemetry_jsonl(&path).expect("Could not load telemetry file"),    
+                            selected_session: "".to_string(),
+                            selected_lap: "".to_string(),
+                            comparison_lap: "".to_string(),
+                        };
+                        self.files_loaded.push(new_telemetry_file);
+                    }
+                });
+            });
+
+        egui::CentralPanel::default().frame(Frame::NONE).show(ctx, |ui| {
+            for tf in self.files_loaded.iter() {
+                // Render UI for each loaded telemetry file
+                egui::Window::new(tf.source_file.to_str().unwrap().to_owned())
+                    .default_width(320.0)
+                    .default_height(480.0)
+                    .resizable([true, false])
+                    .scroll(false)
+                    .show(ctx, |ui| {
+                        ui.label(format!("Telemetry file: {:?}", tf.source_file));
+                    });
+            }
+        });
+    }
+    /*
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui_extras::install_image_loaders(ctx);
         let cur_ui_state = self.ui_state.clone();
@@ -521,7 +561,7 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
             UiState::Loading => {
                 if self.data.is_none() {
                     let telemetry_load_result =
-                        telemetry_loader::load_telemetry_jsonl(self.source_file);
+                        telemetry_loader::load_telemetry_jsonl(self.source_file.unwrap());
                     if telemetry_load_result.is_err() {
                         self.ui_state = UiState::Error {
                             message: format!(
@@ -800,4 +840,5 @@ impl eframe::App for TelemetryAnalysisApp<'_> {
 
         ctx.request_repaint();
     }
+     */
 }
